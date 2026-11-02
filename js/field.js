@@ -161,8 +161,15 @@ export class Field {
     }
     if (this.mount) this.applyMount();
   }
-  setLeader(look) { if (!this.player) return; const { x, z, dir } = this.player; this.scene.remove(this.player.root); this.player = this.makeWalker(look); this.player.spr.pop = 1; this.placePlayer(x, z, dir); }
-  placePlayer(x, z, dir) { const p = this.player; p.x = x + 0.5; p.z = z + 0.5; p.dir = dir; p.ang = null; p.y = groundAt(this.map, p.x, p.z); this.syncWalker(p); p.spr.snapFacing?.(); }
+  setLeader(look) { if (!this.player) return; const { x, z, dir } = this.player; this.scene.remove(this.player.root); this.player = this.makeWalker(look); this.player.spr.pop = 1; this.placePlayer(Math.floor(x), Math.floor(z), dir); }
+  // never start inside something solid (a chest, a barrel, a wall): step to the nearest open cell instead
+  freeCell(x, z) {
+    const open = (i, j) => { const c = this.map?.at(i, j); return c && !c.block && !c.shallow; };
+    if (!this.map || open(x, z)) return [x, z];
+    for (let r = 1; r < 8; r++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dz)) === r && open(x + dx, z + dz)) return [x + dx, z + dz];
+    return [x, z];
+  }
+  placePlayer(x, z, dir) { [x, z] = this.freeCell(x, z); const p = this.player; p.x = x + 0.5; p.z = z + 0.5; p.dir = dir; p.ang = null; p.y = groundAt(this.map, p.x, p.z); this.syncWalker(p); p.spr.snapFacing?.(); }
   syncWalker(w) {
     w.root.position.set(w.x, w.y + (w.hop || 0), w.z);
     if (w.spr.walk) { w.spr.walk(w.ang ?? w.dir, w.moving, w.anim * 1.5); return; }
@@ -199,7 +206,7 @@ export class Field {
     if (this.mount === 'airship') return false;
     if (this.mount === 'bird' && c.shallow) return false;
     if (c.shallow) return true;
-    if (c.block && !(c.spot)) return true;
+    if (c.block && !(c.spot) && !(mover && mover === this.player && Math.floor(mover.x) === Math.floor(x) && Math.floor(mover.z) === Math.floor(z))) return true;
     const h = groundAt(this.map, x, z);
     // a step up or down of more than a third of a unit is a ledge; on stairs the ground rises about one unit per
     // tile, so the allowance grows with how far ahead this probe is (otherwise running up a staircase stalls)
