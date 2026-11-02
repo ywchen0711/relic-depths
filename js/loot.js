@@ -10,6 +10,7 @@ import { GEAR, ELEM, ITEMS } from './data.js?v=1';
 ITEMS.i_tp = { name: '回城卷軸', price: 60, use: { townPortal: true }, field: true, desc: '打開通往營地的傳送門；回來時從營地的藍色水晶走回原地', cat: 'tool' };
 import { WTYPES, mergeFx, FAM_N, STATUS_N } from './content.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
+import { U2, SETS2, powers } from './loot2.js?v=1';
 
 export const RARITY = [
   { n: '普通', c: '#e8e8e8' }, { n: '魔法', c: '#7a9aff' }, { n: '稀有', c: '#ffe04a' }, { n: '暗金', c: '#c8a060' }, { n: '套裝', c: '#3ae06a' },
@@ -30,6 +31,17 @@ for (const [id, g] of Object.entries(GEAR)) {
 // jewellery bases: plain rings and amulets, three grades
 const JEWEL = [['ring', '戒指', 0], ['ring', '銀戒指', 3], ['ring', '金戒指', 6], ['amulet', '護身符', 1], ['amulet', '項鍊', 4], ['amulet', '星之項鍊', 7]];
 JEWEL.forEach(([kind, name, t], i) => { const id = `j_${kind}${i}`; GEAR[id] = { name, slot: 'acc', kind, tier: t, price: 200 + t * 300 }; BASES.push(id); });
+// elite bases: 神話 (tier 8, item level 65+) and 混沌 (tier 9, item level 73+), made from the top base of each kind
+for (const id of BASES.slice()) {
+  const g = GEAR[id]; if (g.tier !== 7) continue;
+  [['神話', 1.25, 8], ['混沌', 1.55, 9]].forEach(([pre, k, t]) => {
+    const e = { ...g, name: pre + g.name.replace(/^(星鐵|星辰|星輝|龍骨|龍息|龍筋|龍語|龍鱗|龍紋)/, ''), tier: t, price: Math.round(g.price * k * 1.6), elite: true };
+    for (const st of ['atk', 'def', 'mag', 'spr', 'hp', 'mp']) if (e[st] > 0) e[st] = Math.round(e[st] * k);
+    const nid = id.replace(/8$/, String(t + 1)); GEAR[nid] = e; BASES.push(nid);
+  });
+}
+// jewellery of the end game
+[['ring', '神秘戒指', 8], ['amulet', '混沌項鍊', 9]].forEach(([kind, name, t], i) => { const id = `j_${kind}e${i}`; GEAR[id] = { name, slot: 'acc', kind, tier: t, price: 4000 + t * 500, elite: true }; BASES.push(id); });
 const catOf = (g) => g.slot === 'acc' ? 'J' : g.slot === 'hand' ? (g.type === 'shield' ? 'S' : 'W') : 'A';
 const ilvlOfTier = (t) => t * 8 + 1; // a base of tier t drops from item level 8t+1 up
 
@@ -77,13 +89,41 @@ const AFFIXES = [
   ...['poison', 'stun', 'sleep', 'silence', 'blind', 'confuse', 'curse'].map((st) => tiered('im' + st, 0, 'AJ', ['・抗' + STATUS_N[st]], [[1, 1]], () => ({ fx: { immune: [st, ...(st === 'stun' ? ['stop'] : [])] } }))),
   tiered('survive', 0, 'J', ['', '', '', '・不屈'], [[0, 0], [0, 0], [0, 0], [1, 1]], () => ({ fx: { survive: 1 } })),
 ].map(([id, pre, cats, tiers]) => ({ id, pre: !!pre, cats, tiers: tiers.filter(t => t[1]) })).filter(a => a.tiers.length);
+// ---------------------------------------------------------------- the end game tiers: item level 70+, the best only on magic items
+const TREE_KEYS = Object.entries(TREES).flatMap(([c, ts]) => ts.map((t, i) => `${c}_${i}`));
+export const treeLabel = (key) => { const [c, i] = key.split('_'); return `${CLASSES[c]?.name}・${TREES[c]?.[+i]?.name}`; };
+const MO = true, res8 = (v) => Object.fromEntries(ELS.map(e => [e, v]));
+const END = {
+  ed: [[72, '殘暴的', [151, 200]], [82, '破滅的', [201, 260], MO], [90, '神罰的', [261, 320], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ ed: rint(g[0], g[1], r) }), m]),
+  edef: [[72, '金剛的', [141, 180]], [82, '神盾的', [181, 230], MO], [90, '不滅的', [231, 300], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ edef: rint(g[0], g[1], r) }), m]),
+  atk: [[72, '殘殺的', [46, 60]], [85, '弒神的', [61, 80], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ atk: rint(g[0], g[1], r) }), m]),
+  mag: [[72, '大魔導的', [46, 60]], [85, '神諭的', [61, 80], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ mag: rint(g[0], g[1], r) }), m]),
+  mp: [[72, '星海的', [121, 170]], [85, '虛空的', [171, 230], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ mp: rint(g[0], g[1], r) }), m]),
+  resall: [[72, '萬象的', [23, 30]], [84, '神佑的', [31, 40], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ res: res8(rint(g[0], g[1], r)) }), m]),
+  leech: [[72, '血神的', [13, 16]], [86, '永生的', [17, 20], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { drain: rint(g[0], g[1], r) / 100 } }), m]),
+  mf: [[72, '命運的', [36, 50]], [86, '眾神寵愛的', [51, 70], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { mf: rint(g[0], g[1], r) } }), m]),
+  skill: [[74, '神匠的', [2, 2]], [88, '至高的', [3, 3], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { skillAll: rint(g[0], g[1], r) } }), m]),
+  hp: [[72, '・巨神', [221, 300]], [82, '・世界樹', [301, 380]], [90, '・永恆', [381, 460], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ hp: rint(g[0], g[1], r) }), m]),
+  str: [[72, '・天神之力', [31, 40]], [86, '・創世', [41, 52], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ atk: rint(g[0], g[1], r) }), m]),
+  spd: [[72, '・瞬影', [6, 6]], [86, '・時之神', [7, 8], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ spd: rint(g[0], g[1], r) }), m]),
+  crit: [[72, '・斬首', [21, 28]], [86, '・死神', [29, 35], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { crit: rint(g[0], g[1], r) / 100 } }), m]),
+  dbl: [[72, '・千刃', [33, 42]], [86, '・無盡', [43, 52], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { dbl: rint(g[0], g[1], r) / 100 } }), m]),
+  hpP: [[74, '・不死', [19, 25]], [88, '・神軀', [26, 32], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { hpP: rint(g[0], g[1], r) / 100 } }), m]),
+  mpreg: [[74, '・魔神', [5, 7], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { mpregen: rint(g[0], g[1], r) / 100 } }), m]),
+  block: [[74, '・神盾', [19, 25]]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { blockUp: rint(g[0], g[1], r) / 100 } }), m]),
+};
+for (const [id, tiers] of Object.entries(END)) { const A = AFFIXES.find(a => a.id === id); if (A) A.tiers.push(...tiers); }
+for (const c of Object.keys(CLASSES)) { const A = AFFIXES.find(a => a.id === 'cls' + c); if (A) A.tiers.push([72, CLASSES[c].name + '神匠的', (r) => ({ fx: { skillCls: { [c]: 3 } } })], [88, CLASSES[c].name + '傳說的', (r) => ({ fx: { skillCls: { [c]: rint(3, 4, r) } } }), MO]); }
+// +skills to one skill tree, like "+3 to Fire Skills": named after the tree it rolled
+AFFIXES.push({ id: 'tree', pre: true, cats: 'WJAS', tiers: [[18, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: 1 } } })], [44, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: rint(1, 2, r) } } })], [70, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: rint(2, 3, r) } } })], [86, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: rint(3, 4, r) } } }), MO]] });
 const AFFIX_BY = Object.fromEntries(AFFIXES.map(a => [a.id, a]));
 export const AFFIX_COUNT = AFFIXES.reduce((s, a) => s + a.tiers.length, 0);
 
-function rollAffix(cat, ilvl, pre, taken, r) {
-  const pool = AFFIXES.filter(a => a.pre === pre && a.cats.includes(cat) && !taken.has(a.id) && a.tiers.some(t => t[0] <= ilvl));
+function rollAffix(cat, ilvl, pre, taken, r, rar = 1) {
+  const fits = (t) => t[0] <= ilvl && (!t[3] || rar === 1);
+  const pool = AFFIXES.filter(a => a.pre === pre && a.cats.includes(cat) && !taken.has(a.id) && a.tiers.some(fits));
   if (!pool.length) return null;
-  const A = pick(pool, r); const ok = A.tiers.filter(t => t[0] <= ilvl);
+  const A = pick(pool, r); const ok = A.tiers.filter(fits);
   // higher tiers are rarer: weight the best few allowed
   const ti = Math.max(0, ok.length - 1 - Math.floor(Math.pow(r(), 0.6) * Math.min(3, ok.length)));
   const T = ok[ti]; taken.add(A.id);
@@ -144,6 +184,9 @@ const U = [
 ];
 export const UNIQUES = {};
 for (const [id, name, base, tier, lv, p, flavor] of U) UNIQUES[id] = { id, name, base, tier, lv, p, flavor };
+// the hundred from loot2.js: powers grow with their level
+const isWpn = (b) => !!WTYPES[b.split(':')[0]];
+U2.forEach(([name, base, lv, tokens, flavor], i) => { UNIQUES[`u2_${i}`] = { id: `u2_${i}`, name, base, tier: Math.min(9, Math.floor(lv / 9)), lv, p: powers(tokens, lv, isWpn(base)), flavor }; });
 
 // ---------------------------------------------------------------- sets
 // pieces: [base, piece name, own powers]; bonus[n] applies when n pieces are worn
@@ -164,6 +207,15 @@ for (const [id, name, lv, pieces, bonus] of SETS_DEF) {
   SETS[id] = { id, name, lv, bonus, pieces: pieces.map((p, i) => `${id}_${i}`) };
   pieces.forEach(([base, pn, p], i) => { SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p }; });
 }
+// the thirty from loot2.js: each piece has a little of the theme, the set grows into it
+SETS2.forEach(([name, lv, cls, themes, pieces], si) => {
+  const id = `s2_${si}`, t = themes.split(' '), n = pieces.length, top = (cls ? `cls:${cls} ` : 'skill ') + 'resall';
+  const bonus = { 2: { fx: powers(t[0], lv, false, 0.6, true).fx }, 3: { fx: powers(n === 3 ? `${t[1]} ${top}` : t[1], lv, false, 0.7, true).fx } };
+  if (n >= 4) bonus[4] = { fx: powers(n === 4 ? `${t[2]} ${top}` : t[2], lv, false, 0.8, true).fx };
+  if (n >= 5) bonus[5] = { fx: powers(`${top} ${t[0]} skill`, lv, false, 0.8, true).fx };
+  SETS[id] = { id, name, lv, bonus, pieces: pieces.map((p, i) => `${id}_${i}`) };
+  pieces.forEach(([base, pn], i) => { SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p: powers(`${isWpn(base) ? 'ed' : base === 'ring' || base === 'amulet' ? 'hp' : 'edef'} ${t[i % t.length]}`, lv, isWpn(base), 0.5) }; });
+});
 export function setBonusFx(equipIds) {
   const count = {};
   for (const id of equipIds) { const g = GEAR[id]; if (g?.lootSet) count[g.lootSet] = (count[g.lootSet] || 0) + 1; }
@@ -174,7 +226,7 @@ export function setBonusFx(equipIds) {
 
 // ---------------------------------------------------------------- a base piece that fits a description
 function baseFor(desc, tierMin, ilvl, r) {
-  const maxT = Math.max(tierMin, Math.min(7, Math.floor((ilvl - 1) / 8)));
+  const maxT = Math.max(tierMin, Math.min(9, Math.floor((ilvl - 1) / 8)));
   const t = rint(tierMin, maxT, r);
   if (desc === 'ring' || desc === 'amulet') return pick(BASES.filter(b => GEAR[b].kind === desc && GEAR[b].tier <= Math.max(GEAR[b].tier, t)), r);
   const [a, b] = desc.split(':');
@@ -200,17 +252,17 @@ export function rollItem(S, ilvl, o = {}, r = Math.random) {
     else rar = 0;
     if (o.minRarity) rar = Math.max(rar, o.minRarity);
   }
-  if (rar === 3) { const pool = Object.values(UNIQUES).filter(u => ilvlOfTier(u.tier) <= ilvl + 4); if (pool.length) { const u = pick(pool, r); return register(S, { b: baseFor(u.base, u.tier, Math.max(ilvl, ilvlOfTier(u.tier)), r), r: 3, il: ilvl, u: u.id }); } rar = 2; }
-  if (rar === 4) { const pool = Object.values(SET_ITEMS).filter(p => p.lv <= ilvl + 4); if (pool.length) { const p = pick(pool, r); return register(S, { b: baseFor(p.base, Math.min(7, Math.floor(p.lv / 8)), Math.max(ilvl, p.lv), r), r: 4, il: ilvl, s: p.id }); } rar = 2; }
+  if (rar === 3) { const all = Object.values(UNIQUES).filter(u => u.lv <= ilvl + 4), near = all.filter(u => u.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const u = pick(pool, r); return register(S, { b: baseFor(u.base, u.tier, Math.max(ilvl, ilvlOfTier(u.tier)), r), r: 3, il: ilvl, u: u.id }); } rar = 2; }
+  if (rar === 4) { const all = Object.values(SET_ITEMS).filter(p => p.lv <= ilvl + 4), near = all.filter(p => p.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const p = pick(pool, r); return register(S, { b: baseFor(p.base, Math.min(9, Math.floor(p.lv / 9)), Math.max(ilvl, p.lv), r), r: 4, il: ilvl, s: p.id }); } rar = 2; }
   // a base piece the item level allows (jewellery only comes magic or better)
-  const maxT = Math.max(0, Math.min(7, Math.floor((ilvl - 1) / 8))), tt = Math.max(0, maxT - (r() < 0.65 ? 0 : 1)); // mostly the best base the level allows
+  const maxT = Math.max(0, Math.min(9, Math.floor((ilvl - 1) / 8))), tt = Math.max(0, maxT - (r() < 0.65 ? 0 : 1)); // mostly the best base the level allows
   let pool = BASES.filter(b => GEAR[b].tier === tt || GEAR[b].slot === 'acc' && GEAR[b].tier <= tt);
   if (o.cat) pool = pool.filter(b => catOf(GEAR[b]) === o.cat);
   if (rar === 0) pool = pool.filter(b => GEAR[b].slot !== 'acc');
   if (!pool.length) pool = BASES.filter(b => GEAR[b].tier === 0);
   const b = pick(pool, r), cat = catOf(GEAR[b]), taken = new Set(), a = [];
-  if (rar === 1) { const np = r() < 0.6 ? 1 : 0, ns = np && r() < 0.5 ? 0 : 1; for (let i = 0; i < np; i++) { const x = rollAffix(cat, ilvl, true, taken, r); if (x) a.push(x); } for (let i = 0; i < ns || !a.length && i < 1; i++) { const x = rollAffix(cat, ilvl, false, taken, r); if (x) a.push(x); } }
-  if (rar === 2) { const n = rint(3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r); if (x) { a.push(x); if (want) pre++; else suf++; } } }
+  if (rar === 1) { const np = r() < 0.6 ? 1 : 0, ns = np && r() < 0.5 ? 0 : 1; for (let i = 0; i < np; i++) { const x = rollAffix(cat, ilvl, true, taken, r, 1); if (x) a.push(x); } for (let i = 0; i < ns || !a.length && i < 1; i++) { const x = rollAffix(cat, ilvl, false, taken, r, 1); if (x) a.push(x); } }
+  if (rar === 2) { const n = rint(ilvl >= 70 ? 4 : 3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r, 2); if (x) { a.push(x); if (want) pre++; else suf++; } } }
   const spec = { b, r: rar, il: ilvl, a };
   if (rar === 2) spec.n = rareName(r);
   if (rar === 0 && r() < 0.15) spec.q = rint(5, 15, r); // superior
@@ -231,6 +283,7 @@ export function restoreLoot(S) { for (const [uid, spec] of Object.entries(S.loot
 export function dropLoot(S, uid) { delete S.loot?.[uid]; }
 
 const STATK = ['hp', 'mp', 'atk', 'def', 'mag', 'spr', 'spd'];
+const TREES_N = (p) => { const k = Object.keys(p.fx?.skillTree || {})[0]; return k ? TREES[k.split('_')[0]]?.[+k.split('_')[1]]?.name || '' : ''; };
 function apply(g, p) {
   if (!p) return;
   if (p.ed && g.atk) g.atk = Math.round(g.atk * (1 + p.ed / 100));
@@ -249,12 +302,12 @@ export function build(spec) {
   delete g.teach; delete g.ap;
   if (spec.q) { if (g.atk) g.atk = Math.round(g.atk * (1 + spec.q / 100)); if (g.def) g.def = Math.round(g.def * (1 + spec.q / 100)); }
   let pre = '', suf = '';
-  for (const [aid, ti, p] of spec.a || []) { const A = AFFIX_BY[aid]; apply(g, p); if (A && spec.r === 1) { if (A.pre) pre = A.tiers[ti]?.[1] || ''; else suf = A.tiers[ti]?.[1] || ''; } }
+  for (const [aid, ti, p] of spec.a || []) { const A = AFFIX_BY[aid]; apply(g, p); if (A && spec.r === 1) { if (aid === 'tree') pre = TREES_N(p) + '的'; else if (A.pre) pre = A.tiers[ti]?.[1] || ''; else suf = A.tiers[ti]?.[1] || ''; } }
   if (spec.u) { const u = UNIQUES[spec.u]; apply(g, u.p); g.name = u.name; g.flavor = u.flavor; g.lvReq = u.lv; g.uniq = spec.u; }
   else if (spec.s) { const p = SET_ITEMS[spec.s]; apply(g, p.p); g.name = p.name; g.lootSet = p.set; g.lvReq = p.lv; g.setPiece = spec.s; }
   else if (spec.r === 2) { g.name = spec.n; g.lvReq = Math.max(1, Math.floor(spec.il * 0.7)); }
   else { g.name = (spec.q ? '精良的' : '') + pre + B.name + suf; g.lvReq = spec.r === 1 ? Math.max(1, Math.floor(spec.il * 0.6)) : Math.max(1, B.tier * 6); }
-  g.lvReq = Math.max(g.lvReq || 1, B.tier * 6);
+  g.lvReq = Math.min(90, Math.max(g.lvReq || 1, B.tier * 6 + (B.tier >= 8 ? (B.tier - 7) * 6 : 0)));
   g.color = undefined; g.rarColor = RARITY[spec.r].c;
   g.price = Math.round((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10));
   return g;
@@ -266,6 +319,7 @@ export function lootLines(g) {
   const o = [], fx = g.fx || {};
   if (fx.skillAll) o.push(`+${fx.skillAll} 所有技能等級`);
   if (fx.skillCls) for (const [c, n] of Object.entries(fx.skillCls)) o.push(`+${n} ${CLASSES[c]?.name}技能等級`);
+  if (fx.skillTree) for (const [k, n] of Object.entries(fx.skillTree)) o.push(`+${n} ${treeLabel(k)}技能等級`);
   if (fx.res) { const v = ELS.map(e => fx.res[e] || 0), all = Math.min(...v); if (all > 0) o.push(`所有抗性 +${all}%`); for (const e of ELS) if ((fx.res[e] || 0) > all) o.push(`${RES_N[e]}抗性 +${fx.res[e] - all}%`); }
   if (fx.mf) o.push(`尋寶率 +${Math.round(fx.mf)}%`);
   return o;

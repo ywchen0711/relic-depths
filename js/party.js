@@ -70,7 +70,7 @@ export function gearFx(S, id, statsOnly) {
   for (const f of setBonusFx(EQUIP_SLOTS.map(sl => h.equip[sl]).filter(Boolean)).fx) fx = mergeFx(fx, f);
   // passive skills from the skill trees (their level counts the +skills on gear too)
   const bonus = (fx.skillAll || 0) + (fx.skillCls?.[id] || 0);
-  for (const [sid, n] of Object.entries(h.pts || {})) { const I = SKILL_INFO[sid]; if (I?.passive && n > 0) fx = mergeFx(fx, I.fxAt(Math.min(SKILL_MAX + 10, n + bonus))); }
+  for (const [sid, n] of Object.entries(h.pts || {})) { const I = SKILL_INFO[sid]; if (I?.passive && n > 0) fx = mergeFx(fx, I.fxAt(Math.min(SKILL_MAX + 10, n + bonus + (fx.skillTree?.[`${id}_${I.tree}`] || 0)))); }
   if (!statsOnly && S.meal?.n > 0) fx = mergeFx(fx, Object.fromEntries(Object.entries(S.meal.fx).filter(([k]) => !['start', 'limit'].includes(k))));
   // resistances: percent points add up (capped at 75%), less the penalty of the harder difficulties
   const pen = [0, 30, 60][S.diff || 0], res = fx.res || {};
@@ -132,7 +132,7 @@ function gearOnlyFx(S, id) { const h = S.heroes[id]; let fx = {}; for (const slo
 // synergy: every point in the tree's other skills makes this one stronger (percent, up to +100%)
 export function synergyOf(S, id, sid) { const I = SKILL_INFO[sid], h = S.heroes[id]; let n = 0; for (const o of TREES[id][I.tree].skills) if (o !== sid) n += h.pts?.[o] || 0; return Math.min(60, Math.round(n * SYNERGY * 100)); }
 export function skillBonus(S, id) { const fx = gearOnlyFx(S, id); return (fx.skillAll || 0) + (fx.skillCls?.[id] || 0); }
-export function skillLv(S, id, sid) { const n = S.heroes[id].pts?.[sid] || 0; return n > 0 ? Math.min(SKILL_MAX + 10, n + skillBonus(S, id)) : 0; }
+export function skillLv(S, id, sid) { const n = S.heroes[id].pts?.[sid] || 0; if (n <= 0) return 0; const t = gearOnlyFx(S, id).skillTree?.[`${id}_${SKILL_INFO[sid].tree}`] || 0; return Math.min(SKILL_MAX + 10, n + skillBonus(S, id) + t); }
 // can a point go into this skill now? ('' means yes)
 export function canLearn(S, id, sid) {
   const h = S.heroes[id], I = SKILL_INFO[sid]; if (!I || I.cls !== id) return '不是這個職業的技能';
@@ -275,7 +275,7 @@ export function gearAccent(G) {
 // what one piece puts on the doll; the same fragment draws the item's own picture
 export function gearLook(G, hero) {
   if (!G) return {};
-  const c = gearColor(G), a = gearAccent(G), t = G.tier || 0, H = hero ? HEROES[hero] : null, o = {};
+  const c = gearColor(G), a = gearAccent(G), t = Math.min(7, G.tier || 0), H = hero ? HEROES[hero] : null, o = {};
   if (G.slot === 'hand') {
     if (G.type === 'shield') { o.shield = true; o.shieldKind = G.kind || 'kite'; o.shieldTier = t; o.shieldColor = c; o.shieldEmblem = a || (t >= 4 ? '#e8c050' : undefined); o.shieldRim = t >= 6 ? '#fff0b0' : t >= 2 ? '#e8c050' : darker(c, 0.7); }
     else { o.weapon = G.type === 'knuckle' ? 'knuckle' : WTYPES[G.type]?.model ?? null; o.weaponTier = t; o.weaponRefine = G.refine || 0; o.weaponMetal = METAL_C[Math.min(7, t)]; o.weaponAccent = a; }
