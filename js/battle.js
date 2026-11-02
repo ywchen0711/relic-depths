@@ -77,19 +77,19 @@ export class Battle {
     if (this.stage) { this.scene.remove(this.stage); }
     const B = BG[bgKey] || BG.field; this.bg = B;
     const st = new THREE.Group(); this.stage = st; this.scene.add(st);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 24), new THREE.MeshStandardMaterial({ map: tileTex(B.tile[0], B.tile[1]).clone(), roughness: 1 }));
-    ground.material.map.repeat.set(20, 12); ground.material.map.needsUpdate = true;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(64, 40), new THREE.MeshStandardMaterial({ map: tileTex(B.tile[0], B.tile[1]).clone(), roughness: 1 }));
+    ground.material.map.repeat.set(32, 20); ground.material.map.needsUpdate = true;
     ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; st.add(ground);
     // a raised back ridge so the horizon is a diorama edge
-    const ridge = new THREE.Mesh(new THREE.BoxGeometry(40, 1.4, 2), new THREE.MeshStandardMaterial({ map: tileTex(B.side[0], B.side[1]), roughness: 1 }));
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(64, 1.4, 2), new THREE.MeshStandardMaterial({ map: tileTex(B.side[0], B.side[1]), roughness: 1 }));
     ridge.position.set(0, 0.7, -9); ridge.receiveShadow = true; st.add(ridge);
     const sky = skyDome(B.sky[0], B.sky[1]); st.add(sky);
     this.scene.fog = new THREE.Fog(B.fog, 18, 60);
     // props scattered behind and to the sides
     let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 34; i++) {
       const [k, c] = B.props[i % B.props.length];
-      const x = -16 + r() * 32, z = -9.5 + r() * 4 + (Math.abs(x) > 9 ? r() * 8 : 0);
+      const x = -24 + r() * 48, z = -9.5 + r() * 4 + (Math.abs(x) > 9 ? r() * 8 : 0);
       if (Math.abs(x) < 7.5 && z > -5) continue;
       const px = propPx(k, c); const sp = new Sprite(propCanvas(px), 1, { scale: 1.3 + r() * 0.5 });
       sp.mesh.position.set(x, z < -8 ? 1.4 : 0, z); st.add(sp.mesh);
@@ -1314,7 +1314,7 @@ export class Battle {
     // camera: gentle sway, intro sweep, focus on the actor, zoom for resonance
     const cur = this.current;
     const fx = cur && cur.side !== 'summon' ? (cur.x + (cur.ox || 0)) * 0.15 : 0;
-    const zoom = (this.camZoom ? 0.8 : 1) * 1.12; // a little wider than Crystal Echoes: bigger packs and minions
+    const zoom = (this.camZoom ? 0.8 : 1) * 1.75; // much wider than Crystal Echoes: bigger packs and minions
     const intro = this.camIntro ? 1.3 : 1;
     { const d = fx - (this.camX ?? 0); this.camX = Math.abs(d) < 0.002 ? fx : (this.camX ?? 0) + d * Math.min(1, dt * 3); }
     const shake = this.camShake > 0 ? (this.camShake -= dt, (Math.random() - 0.5) * this.camShake * 0.6) : 0;
