@@ -676,7 +676,7 @@ export class VoxelSprite {
     if (!geo) { geo = meshGrid(slab(px), 0.03); slabCache.set(key, geo); }
     this.glow = opts.glow ?? 0.16; this.mat = voxelMaterial(this.glow);
     this.inner = new THREE.Mesh(geo, this.mat); this.inner.castShadow = true;
-    const k = this.scale / 16; this.k = k; this.inner.scale.set(k, k, k * (0.4 + DEPTH * 0.6)); this.inner.position.y = 0.5 * k;
+    const k = this.scale / 16 / (px.res || 1); this.k = k; // high-resolution art (res 2) keeps the same size this.inner.scale.set(k, k, k * (0.4 + DEPTH * 0.6)); this.inner.position.y = 0.5 * k;
     this.card = new THREE.Group(); this.card.add(this.inner);
     this.mesh = new THREE.Group(); this.mesh.add(this.card); toLayer(this.mesh);
     this.pop = PAPER ? 0 : 1; this.popDelay = 0;

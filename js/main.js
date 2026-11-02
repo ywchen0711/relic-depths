@@ -19,6 +19,7 @@ import { Grind } from './grind.js?v=1';
 import { HEROES, ITEMS, ENEMIES, GEAR } from './data.js?v=1';
 import { BESTIARY_NEW } from './content.js?v=1';
 import { newState, addHero, addItem, itemName, healAll, heroStats, migrate, gearFx, paperLook } from './party.js?v=1';
+import './beasts.js?v=1';
 
 const SAVE_KEY = 'relic-depths-save-v1';
 const wait = (ms) => new Promise(r => setTimeout(r, ms));

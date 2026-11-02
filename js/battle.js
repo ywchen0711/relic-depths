@@ -130,7 +130,7 @@ export class Battle {
     this.S.minions = (this.S.minions || []).filter(r => P.includes(r.owner) && r.hp > 0);
     { const used = new Set(); for (const r of this.S.minions.slice(0, MSLOTS.length)) { const i = minionSlot(used, r.big); used.add(i); this.addMinion(r, i); } }
     const n = troop.length;
-    const eslots = n === 1 ? [[-3.8, 0]] : n === 2 ? [[-2.9, -1.4], [-5.0, 1.0]] : n === 3 ? [[-2.4, -1.9], [-5.4, -0.6], [-3.2, 1.6]] : [[-2.2, -2.0], [-5.0, -1.3], [-2.6, 0.9], [-5.4, 1.9]];
+    const eslots = n === 1 ? [[-4.0, 0]] : n === 2 ? [[-3.2, -1.2], [-6.6, 0.9]] : n === 3 ? [[-2.6, -2.4], [-7.4, -2.4], [-5.0, 2.0]] : [[-2.6, -2.4], [-7.4, -2.4], [-5.0, 2.0], [-9.8, 2.0]]; // two staggered rows, so no one hides behind another
     const letters = 'ABCD'; const count = {};
     troop.forEach((eid, i) => {
       count[eid] = (count[eid] || 0) + 1;
@@ -149,7 +149,7 @@ export class Battle {
   makeEnemy(eid, pos, suffix = '', opts = {}) {
     const E = ENEMIES[eid];
     let px = monsterPx(E.kind, E.colors); if (E.kind !== 'knight') px = px.flip();
-    const scale = (E.boss ? 1.25 : 1.05) * (E.scale || 1);
+    const scale = (E.boss ? 1.45 : 1.35) * (E.scale || 1); // bigger than in Crystal Echoes, so the art reads from the far camera
     const spr = new VoxelSprite(px, { scale });
     const st = { hp: E.hp, mp: 999, atk: E.atk, def: E.def, mag: E.mag, spr: E.spr, spd: E.spd };
     const bal = balanceFor(opts.mod ? '_' : eid, E, this.G.S.settings.diff); // dungeon monsters all use the general line st.hp = Math.round(st.hp * bal[0]); st.atk = Math.round(st.atk * bal[1]); st.mag = Math.round(st.mag * bal[1]);

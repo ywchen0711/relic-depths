@@ -490,7 +490,7 @@ export class UI {
     const S = this.S, kills = S.kills || {}, seen = S.dropSeen || {};
     const list = Object.keys(ENEMIES).filter(id => !id.endsWith('_trial')).sort((a, b) => ENEMIES[a].lv - ENEMIES[b].lv);
     const met = list.filter(id => kills[id] || S.flags['seen_' + id]).length;
-    const pic = (id) => { try { const E = ENEMIES[id]; return monsterPx(E.kind, E.colors).canvas(3).toDataURL(); } catch (e) { return ''; } };
+    const pic = (id) => { try { const E = ENEMIES[id]; const px = monsterPx(E.kind, E.colors); return px.canvas(px.res === 2 ? 2 : 3).toDataURL(); } catch (e) { return ''; } };
     await this.choose(list.map((id, n) => { const k = kills[id] || 0, E = ENEMIES[id]; return { label: k || S.flags['seen_' + id] ? E.name : '？？？', sub: `Lv ${E.lv}${k ? '　' + k : ''}` }; }), {
       title: `怪物圖鑑　${met}/${list.length}`, cls: 'items', info: (n) => {
         const id = list[n], E = ENEMIES[id], k = kills[id] || 0;

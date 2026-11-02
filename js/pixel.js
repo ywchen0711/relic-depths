@@ -48,7 +48,7 @@ export class Px {
     for (const [x, y] of add) this.d[y * this.w + x] = c;
     return this;
   }
-  flip() { const o = new Px(this.w, this.h); for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) o.d[y * this.w + x] = this.get(this.w - 1 - x, y); return o; }
+  flip() { const o = new Px(this.w, this.h); o.res = this.res; for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) o.d[y * this.w + x] = this.get(this.w - 1 - x, y); return o; }
   canvas(scale = 1) {
     const c = document.createElement('canvas'); c.width = this.w * scale; c.height = this.h * scale;
     const g = c.getContext('2d');
