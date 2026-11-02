@@ -291,9 +291,16 @@ export function autoBuild(S, id) {
 }
 
 // ---------------------------------------------------------------- waypoints
+// where to start in the Dead King's palace: the first floor, or just past any guardian already beaten
+P.palaceMenu = async function () {
+  const S = this.S, ck = S.palace?.ckpt || 1, starts = [1]; for (let f = 11; f <= ck; f += 10) starts.push(f);
+  const i = await this.choose(starts.map(f => ({ label: `第 ${f} 層`, sub: f === 1 ? '從頭開始' : `第 ${f - 1} 層的守護者之後` })), { title: '死王宮殿　從哪一層開始？', cls: 'small' });
+  return i < 0 ? null : starts[i];
+};
 P.waypointMenu = async function () {
   const S = this.S, d = S.diff || 0, rows = [{ label: '暮光營地', sub: '', to: 'town' }];
   if (S.portal && this.G.field.def.town && MAPS[S.portal.map]) rows.unshift({ label: '<span style="color:#8ab8ff">回到傳送門</span>', sub: MAPS[S.portal.map].name.split('　')[0], to: 'portal' });
+  if (S.palace?.open && this.G.field.def.town) rows.push({ label: '<span style="color:#ff6a6a">死王宮殿</span>', sub: `最深 第${S.palace.best || 0}層`, to: 'palace' });
   ACTS.forEach((A, a) => WP_LEVELS.forEach(l => { if (S.wp[`d${d}a${a}l${l}`]) rows.push({ label: `${A.n.split('　')[1]}・${A.levels[l][0]}`, sub: `第${a + 1}幕`, to: mapId(a, l) }); }));
   const i = await this.choose(rows, { title: `傳送點　<span style="color:${DIFFS[d].c}">${DIFFS[d].n}</span>`, cls: 'small' });
   return i < 0 ? null : rows[i].to;

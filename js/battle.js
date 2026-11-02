@@ -165,6 +165,7 @@ export class Battle {
     if (M?.lv) for (const k of ['hp', 'atk', 'def', 'mag', 'spr', 'spd']) st[k] = scaleTo(st[k], k, E.lv, lv);
     if (M?.rank === 1) { st.hp = Math.round(st.hp * 2.2); st.atk = Math.round(st.atk * 1.2); st.mag = Math.round(st.mag * 1.2); }
     if (M?.rank === 2) { st.hp = Math.round(st.hp * 5); st.atk = Math.round(st.atk * 1.45); st.mag = Math.round(st.mag * 1.45); st.def = Math.round(st.def * 1.2); st.spd = Math.round(st.spd * 1.15); }
+    if (opts.pw) { const w = opts.pw; st.hp = Math.round(st.hp * w.hp); st.atk = Math.round(st.atk * w.atk); st.mag = Math.round(st.mag * w.atk); st.def = Math.round(st.def * w.def); st.spr = Math.round(st.spr * w.def); } // the Dead King's palace, deeper is stronger
     const extraTraits = [], mods = (M?.mods || []).map(k => MODS[k]).filter(Boolean);
     for (const m of mods) { if (m.atk) { st.atk = Math.round(st.atk * m.atk); st.mag = Math.round(st.mag * m.atk); } if (m.spd) st.spd = Math.round(st.spd * m.spd); if (m.def) st.def = Math.round(st.def * m.def); if (m.traits) extraTraits.push(...m.traits); }
     const nm = M?.rank === 2 ? `${M.name}・${E.name}` : M?.rank === 1 ? `冠軍${E.name}` : E.name;
@@ -1347,8 +1348,9 @@ export class Battle {
     const best = (k) => Math.max(0, ...this.party.map(u => u.fx?.[k] || 0)) + (this.S.meal?.n > 0 ? this.S.meal.fx[k] || 0 : 0);
     if (P.includes('p_exp')) exp = Math.round(exp * 1.5);
     if (P.includes('p_gil')) gil = Math.round(gil * 1.5);
-    exp = Math.round(exp * (1 + best('exp'))); gil = Math.round(gil * (1 + best('gil')));
-    const dropMul = 1 + best('drop') + (this.dropBonus || 0);
+    const LQ = this.opts.lootQ || 1, rich = 1 + (LQ - 1) * 0.3; // the palace pays better the deeper you go
+    exp = Math.round(exp * (1 + best('exp')) * rich); gil = Math.round(gil * (1 + best('gil')) * rich);
+    const dropMul = (1 + best('drop') + (this.dropBonus || 0)) * rich;
     const drops = [];
     this.S.kills = this.S.kills || {}; this.S.dropSeen = this.S.dropSeen || {};
     // loot: every monster may drop an item; champions, unique monsters and bosses drop more and better
@@ -1358,7 +1360,7 @@ export class Battle {
       this.S.kills[u.id] = (this.S.kills[u.id] || 0) + 1;
       const il = u.lootLv || u.lv, boss = u.E.boss || this.opts.boss;
       const n = boss ? 3 + Math.floor(Math.random() * 3) : u.rank === 2 ? 2 + (Math.random() < 0.5 ? 1 : 0) : u.rank === 1 ? (Math.random() < 0.7 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0) : Math.random() < 0.16 * dropMul ? 1 : 0;
-      for (let i = 0; i < n; i++) loot.push(rollItem(this.S, il + (boss ? 3 : u.rank || 0), { mf, quality: boss ? 2.5 : u.rank === 2 ? 2 : u.rank === 1 ? 1.5 : 1, minRarity: boss || u.rank === 2 ? 1 : 0 }));
+      for (let i = 0; i < n; i++) loot.push(rollItem(this.S, il + (boss ? 3 : u.rank || 0), { mf, quality: (boss ? 2.5 : u.rank === 2 ? 2 : u.rank === 1 ? 1.5 : 1) * LQ, minRarity: boss || u.rank === 2 || LQ > 1 && Math.random() < 0.5 ? 1 : 0 }));
       if (Math.random() < 0.18) { const pot = il < 15 ? 'potion' : il < 35 ? 'hipotion' : 'i_hp3'; addItem(this.S, pot, 1); drops.push(pot); }
       if (Math.random() < 0.08) { addItem(this.S, il < 25 ? 'ether' : 'hiether', 1); drops.push(il < 25 ? 'ether' : 'hiether'); }
       if (Math.random() < 0.05) { addItem(this.S, 'i_tp', 1); drops.push('i_tp'); }

@@ -10,13 +10,13 @@ import { Input } from './input.js?v=1';
 import { makeStory, QUESTS } from './town.js?v=1';
 import './menus.js?v=1';
 import { autoBuild } from './menus.js?v=1';
-import { restoreLoot, rollItem } from './loot.js?v=1';
-import { genLevel, parseId, rollTroop, ACTS, WP_LEVELS, mapId, DIFFS } from './dungeon.js?v=1';
+import { restoreLoot, rollItem, dropLoot } from './loot.js?v=1';
+import { genLevel, parseId, rollTroop, ACTS, WP_LEVELS, mapId, DIFFS, genPalace, parsePalace, palaceId } from './dungeon.js?v=1';
 import { CLASSES } from './classes.js?v=1';
 import { MAPS } from './maps.js?v=1';
 import { AutoMap } from './automap.js?v=1';
 import { Grind } from './grind.js?v=1';
-import { HEROES, ITEMS, ENEMIES, GEAR } from './data.js?v=1';
+import { HEROES, ITEMS, ENEMIES, GEAR, EXP_NEXT } from './data.js?v=1';
 import { BESTIARY_NEW } from './content.js?v=1';
 import { newState, addHero, addItem, itemName, healAll, heroStats, migrate, gearFx, paperLook } from './party.js?v=1';
 import './beasts.js?v=1';
@@ -117,6 +117,7 @@ class Game {
       const ch = /^ch(\d)$/.exec(tok), q = /^(q_\w+?)_(taken|done|ready)$/.exec(tok);
       if (ch) v = this.S.chapter >= +ch[1];
       else if (q) { const s = this.S.quests[q[1]]; v = q[2] === 'taken' ? !!s : s === q[2]; }
+      else if (tok === 'pboss') v = !!this.field.def?.bossDone; // a palace guardian beaten
       else v = !!this.S.flags[tok];
       return neg ? !v : v;
     });
@@ -209,11 +210,11 @@ class Game {
             const gold = Math.random() < 0.75 ? Math.round(lv * (2 + Math.random() * 5)) : 0; this.S.gil += gold;
             if (Math.random() < 0.3) { const p = lv < 25 ? 'potion' : Math.random() < 0.15 ? 'xpotion' : 'hipotion'; addItem(this.S, p, 1); got.push(itemName(p)); }
             if (Math.random() < 0.06) { addItem(this.S, 'i_tp', 1); got.push(itemName('i_tp')); }
-            if (Math.random() < 0.2) { const g = rollItem(this.S, lv, { mf }); addItem(this.S, g, 1); got.push(`<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`); }
+            if (Math.random() < 0.2) { const g = rollItem(this.S, lv, { mf, quality: f.def.lootQ || 1 }); addItem(this.S, g, 1); got.push(`<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`); }
             if (!gold && !got.length) this.ui.toast(`${nm}裡什麼也沒有`);
             else this.ui.toast(`${nm}：${[gold ? `${gold} G` : '', ...got].filter(Boolean).join('、')}`);
           }
-          else if (o?.loot) { const n = 1 + (Math.random() < 0.4 ? 1 : 0), got = []; const mf = Math.max(0, ...this.S.party.map(id => gearFx(this.S, id).mf || 0)); for (let i = 0; i < n; i++) { const g = rollItem(this.S, o.loot, { mf, quality: 1.6 }); addItem(this.S, g, 1); got.push(g); } const gold = Math.round(o.loot * (8 + Math.random() * 12)); this.S.gil += gold; await this.ui.say('', `找到了 ${gold} G 和：\n${got.map(g => `<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`).join('\n')}`, null); }
+          else if (o?.loot) { const n = 1 + (Math.random() < 0.4 ? 1 : 0), got = []; const mf = Math.max(0, ...this.S.party.map(id => gearFx(this.S, id).mf || 0)); for (let i = 0; i < n; i++) { const g = rollItem(this.S, o.loot, { mf, quality: 1.6 * (f.def.lootQ || 1) }); addItem(this.S, g, 1); got.push(g); } const gold = Math.round(o.loot * (8 + Math.random() * 12)); this.S.gil += gold; await this.ui.say('', `找到了 ${gold} G 和：\n${got.map(g => `<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`).join('\n')}`, null); }
           if (o?.gil) { this.S.gil += o.gil; await this.ui.say('', `找到了 ${o.gil} G！`, null); }
           if (item) { addItem(this.S, item, 1); await this.ui.say('', `找到了 ${itemName(item)}！`, null); }
           if (item === 'k_necklace' && this.S.quests.q_necklace === 'taken') this.ui.toast('找到了莉莉的項鍊！回港口交給她吧');
@@ -224,6 +225,7 @@ class Game {
         this.audio.sfx('save'); this.unlockHere(); this.save();
         const to = await this.ui.waypointMenu();
         if (to === 'portal') { const P = this.S.portal; this.busy = false; await this.warp(P.map, P.x, P.z, 'down', { portal: true }); }
+        else if (to === 'palace') { const fl = await this.ui.palaceMenu(); if (fl) { this.busy = false; await this.travel(palaceId(fl)); } }
         else if (to && to !== this.field.mapId) { this.busy = false; await this.travel(to); }
       } else if (it.kind === 'tablet') {
         this.S.tablets.push(it.id); it.sprite.visible = false; f.built.interact = f.built.interact.filter(x => x !== it);
@@ -238,8 +240,9 @@ class Game {
 
   // ---------------------------------------------------------------- moving between places
   // dungeon levels are laid out when you enter them; going out from the camp starts a fresh expedition
-  clearDungeons() { for (const k of Object.keys(MAPS)) if (parseId(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^d\d_\d_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (parseId(k)) delete this.S.explored[k]; }
+  clearDungeons() { const dun = (k) => parseId(k) || parsePalace(k); for (const k of Object.keys(MAPS)) if (dun(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^(d\d_\d|p\d+)_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (dun(k)) delete this.S.explored[k]; }
   ensureMap(to) {
+    const pf = parsePalace(to); if (pf) { if (!MAPS[to]) { const def = genPalace(this.S, pf, this.S.seeds?.[to]); this.S.seeds = this.S.seeds || {}; this.S.seeds[to] = def.seed; } return; }
     const p = parseId(to); if (!p) return;
     if (!MAPS[to]) { const seed = this.S.seeds?.[to]; const def = genLevel(this.S, p.act, p.lvl, seed); this.S.seeds = this.S.seeds || {}; this.S.seeds[to] = def.seed; }
   }
@@ -249,8 +252,12 @@ class Game {
     if (o.cond && !this.cond(o.cond)) return;
     this.busy = true;
     if (!o.quiet) { if (o.door) this.audio.sfx('door'); await this.ui.fade(1, 300); }
-    if (this.field.def?.town && parseId(to) && !o.portal) this.clearDungeons();
+    if (this.field.def?.town && (parseId(to) || parsePalace(to)) && !o.portal) this.clearDungeons();
     if (o.portal) this.S.portal = null;
+    // the palace: remember how deep you have been, and what you carried when you went down (see palaceDeath)
+    const pf = parsePalace(to);
+    if (pf) { this.S.palace = { open: 1, best: 0, ...(this.S.palace || {}) }; this.S.palace.best = Math.max(this.S.palace.best, pf); if (!this.S.prun) this.S.prun = { before: this.owned() }; }
+    if (to === 'town') this.S.prun = null; // back on the surface: everything found is safe
     this.ensureMap(to);
     if (x === -1) [x, z, dir] = MAPS[to].spawn; else if (x === -2) [x, z, dir] = MAPS[to].exitSpawn;
     if (to === 'town') this.placePortal();
@@ -269,8 +276,9 @@ class Game {
   async onLockedWarp(o) {
     this.busy = true;
     if (o.to === 'lighthouse') await this.ui.say('希爾薇', '燈塔要等神官大人的許可才能進去。', 'sylvie');
-    else await this.ui.say('', '門鎖著。', null);
-    const p = this.field.player; p.z -= 0.6; this.field.syncWalker(p);
+    else if (!o.lockMsg) await this.ui.say('', '門鎖著。', null);
+    if (o.lockMsg) await this.ui.say('', o.lockMsg, null);
+    const p = this.field.player; p.z += o.push ?? -0.6; this.field.syncWalker(p);
     this.busy = false;
   }
   async onSpot(s) {
@@ -302,7 +310,7 @@ class Game {
     if (this.busy || this.mode !== 'field') return;
     const T = rollTroop(this.S, this.field.def);
     if (T.kind === 'unique') this.ui.toast(`<span style="color:#e8b040">獨特怪物出現了！</span>`);
-    const res = await this.fight({ troop: T.troop, mods: T.mods, bg: this.bgFor(), preemptive: Math.random() < 0.1, random: true });
+    const res = await this.fight({ troop: T.troop, mods: T.mods, bg: this.bgFor(), preemptive: Math.random() < 0.1, random: true, pw: this.field.def.pw, lootQ: this.field.def.lootQ });
     if (this.grind) await this.grind.afterBattle(res, this.battle.lastSpoils);
     return res;
   }
@@ -338,14 +346,17 @@ class Game {
         res = opts.random ? 'flee' : 'win';
       }
       if (res !== 'lose') break;
-      const choice = await this.gameOver(!!opts.random);
+      const palace = !!parsePalace(this.field.mapId);
+      const choice = await this.gameOver(!!opts.random, palace);
       if (choice === 'retry') { const s = JSON.parse(snapshot); Object.assign(this.S, s); continue; }
       await this.ui.fade(1, 400); document.body.classList.remove('inbattle');
       this.mode = 'field';
-      // fallen: wake up in the camp, a tenth of the gold gone
-      const lost = Math.floor(this.S.gil * 0.1); this.S.gil -= lost;
+      // fallen: wake up in the camp, a tenth of the gold gone (in the palace much more: see palaceDeath)
+      const P = palace ? this.palaceDeath() : null;
+      const lost = P ? P.gold : Math.floor(this.S.gil * 0.1); if (!P) this.S.gil -= lost;
       healAll(this.S); await this.warp('town', 15, 18, 'down', { quiet: true }); await this.ui.fade(0, 400); this.busy = wasBusy;
-      this.ui.toast(`全隊倒下了……在營地醒來，掉了 ${lost} G`, 4000);
+      if (P) await this.ui.say('', `你倒在了死王宮殿……\n在營地醒來，失去了 ${lost} G 和經驗值。${P.items.length ? `\n\n宮殿裡拿到的東西掉了一半（${P.items.length} 件）：\n${P.items.slice(0, 12).join('、')}${P.items.length > 12 ? ' 等' : ''}` : ''}`, null);
+      else this.ui.toast(`全隊倒下了……在營地醒來，掉了 ${lost} G`, 4000);
       return 'lose';
     }
     await this.ui.fade(1, 250);
@@ -363,15 +374,35 @@ class Game {
     this.post.grade.uniforms.flash.value = 0.8;
     await wait(450); await this.ui.fade(1, 150); e.classList.remove('go');
   }
-  gameOver(random) {
+  // everything the party owns, bag and worn, as counts
+  owned() { const o = { ...this.S.items }; for (const h of Object.values(this.S.heroes)) for (const g of Object.values(h.equip || {})) if (g) o[g] = (o[g] || 0) + 1; return o; }
+  // dying in the palace: 30% of the gold, 15% of a level's experience for everyone, and a random half of what was found down there
+  palaceDeath() {
+    const S = this.S, gold = Math.floor(S.gil * 0.3); S.gil -= gold;
+    for (const h of Object.values(S.heroes)) h.exp = Math.max(0, h.exp - Math.round(EXP_NEXT(h.lv) * 0.15));
+    const before = S.prun?.before || {}, gained = [];
+    for (const [k, n] of Object.entries(this.owned())) for (let i = 0; i < n - (before[k] || 0); i++) gained.push(k);
+    for (let i = gained.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [gained[i], gained[j]] = [gained[j], gained[i]]; }
+    const lose = gained.slice(0, Math.ceil(gained.length / 2)), names = [];
+    for (const k of lose) {
+      names.push(GEAR[k] ? `<span style="color:${GEAR[k].rarColor || '#fff'}">${GEAR[k].name}</span>` : itemName(k));
+      if (S.items[k] > 0) { S.items[k]--; if (!S.items[k]) delete S.items[k]; }
+      else for (const h of Object.values(S.heroes)) { const sl = Object.keys(h.equip || {}).find(x => h.equip[x] === k); if (sl) { h.equip[sl] = null; break; } }
+      if (S.loot?.[k] && !this.owned()[k]) dropLoot(S, k);
+    }
+    S.prun = null;
+    return { gold, items: names };
+  }
+  gameOver(random, palace) {
     return new Promise((res) => {
       this.audio.music(null);
       const box = document.getElementById('gameover'); box.classList.add('on');
-      box.innerHTML = `<h2>全滅了……</h2><p>深淵吞沒了你們。</p><div class="go-btns"><button data-v="retry">重新挑戰這場戰鬥</button><button data-v="load">回到營地（失去10%金幣）</button></div>`;
+      box.innerHTML = palace ? `<h2>全滅了……</h2><p>死王宮殿不給第二次機會。</p><div class="go-btns"><button data-v="load">回到營地（失去 30% 金幣、經驗值，以及這次在宮殿拿到的一半東西）</button></div>`
+        : `<h2>全滅了……</h2><p>深淵吞沒了你們。</p><div class="go-btns"><button data-v="retry">重新挑戰這場戰鬥</button><button data-v="load">回到營地（失去10%金幣）</button></div>`;
       const pick = (v) => { box.classList.remove('on'); off(); res(v); };
       box.querySelectorAll('button').forEach(b => b.onclick = () => pick(b.dataset.v));
       let sel = 0; const btns = [...box.querySelectorAll('button')]; btns[0].classList.add('sel');
-      const off = this.input.on((k) => { if (k === 'up' || k === 'down') { btns[sel].classList.remove('sel'); sel = 1 - sel; btns[sel].classList.add('sel'); } if (k === 'ok') pick(btns[sel].dataset.v); });
+      const off = this.input.on((k) => { if (k === 'up' || k === 'down') { btns[sel].classList.remove('sel'); sel = (sel + 1) % btns.length; btns[sel].classList.add('sel'); } if (k === 'ok') pick(btns[sel].dataset.v); });
     });
   }
 
@@ -397,7 +428,8 @@ class Game {
       restoreLoot(this.S);
       this.applySettings();
       this.clearDungeons(); this.S.seeds = s.seeds || {};
-      if (!MAPS[this.S.map] && !parseId(this.S.map)) this.S.map = 'town';
+      if (this.S.cleared?.['2_4'] && !this.S.palace?.open) this.S.palace = { best: 0, ...(this.S.palace || {}), open: 1 }; // hell beaten before the palace existed
+      if (!MAPS[this.S.map] && !parseId(this.S.map) && !parsePalace(this.S.map)) this.S.map = 'town';
       this.ensureMap(this.S.map); if (this.S.map === 'town') this.placePortal();
       this.field.load(this.S.map, this.S.x, this.S.z, this.S.dir, { mount: null });
       this.field.player.root.visible = true;

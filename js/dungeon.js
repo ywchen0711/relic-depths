@@ -100,8 +100,9 @@ const boxObj = (key, extra) => { const B = BOX[key] || BOX.chest; return { k: 'c
 
 // ---------------------------------------------------------------- a dungeon level
 function rng(seed) { let s = (seed * 9301 + 49297) % 233280 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
-export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9)) {
-  const A = ACTS[act], [name, theme0, hab] = A.levels[lvl], r = rng(seed), L = LOOK[`${act}_${lvl}`] || {}, theme = L.theme || theme0;
+// X lays out a floor of the Dead King's palace instead (see genPalace): its own name, look, level and ways in and out
+export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9), X = null) {
+  const A = ACTS[act], [name, theme0, hab] = X ? [X.name, X.theme, X.hab] : A.levels[lvl], r = rng(seed), L = X ? X.look : LOOK[`${act}_${lvl}`] || {}, theme = L.theme || theme0;
   const W = 40 + Math.floor(r() * 8), H = 40 + Math.floor(r() * 6), open = '#';
   const g = new G(W, H, open);
   // the main way: from the bottom to the top, zigzagging across
@@ -122,21 +123,25 @@ export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9)) {
   g.path(pts, '.', 1); // keep the way itself clear
   g.rect(0, 0, W - 1, 0, open).rect(0, H - 1, W - 1, H - 1, open).rect(0, 0, 0, H - 1, open).rect(W - 1, 0, W - 1, H - 1, open);
   const m = g.done();
-  const [sx, sz] = pts[0], [ex, ez] = pts[n - 1], last = lvl === 3;
-  const id = mapId(act, lvl), objs = [];
+  const [sx, sz] = pts[0], [ex, ez] = pts[n - 1], last = X ? !X.next : lvl === 3;
+  const id = X ? X.id : mapId(act, lvl), objs = [], lv = X ? X.lv : areaLevel(S, act, lvl);
   // the way back and the way on
   const backN = lvl === 0 ? '▲ 返回營地' : `▲ 上一層：${A.levels[lvl - 1][0]}`, nextN = `▼ 下一層：${A.levels[lvl + 1]?.[0] || ''}`;
-  objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: lvl === 0 ? 'town' : mapId(act, lvl - 1), tx: lvl === 0 ? 15 : -2, tz: lvl === 0 ? 22 : -2, dir: lvl === 0 ? 'up' : 'down', label: backN.slice(2) }, { k: 'gate', x: sx - 1, z: sz + 2, w: 3, color: '#6ab8ff', label: backN, back: true });
-  if (!last) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: mapId(act, lvl + 1), tx: -1, tz: -1, dir: 'up', label: nextN.slice(2) }, { k: 'gate', x: ex - 1, z: ez - 2, w: 3, color: '#ffb04a', label: nextN });
-  else { objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: 'boss', act }); objs.push({ k: 'bigcrystal', x: ex, z: ez - 1, color: '#b06aff' }); }
-  if (WP_LEVELS.includes(lvl)) objs.push({ k: 'crystal', x: sx + 2, z: sz - 1 });
+  if (X) {
+    const B = X.back; objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: B.to, tx: B.tx, tz: B.tz, dir: B.dir, label: B.label }, { k: 'gate', x: sx - 1, z: sz + 2, w: 3, color: '#6ab8ff', label: '▲ ' + B.label, back: true });
+    if (X.next) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: X.next.to, tx: -1, tz: -1, dir: 'up', label: X.next.label, ...(X.boss ? { cond: 'pboss', lockMsg: '守護者還擋在門前。', push: 0.8 } : {}) }, { k: 'gate', x: ex - 1, z: ez - 2, w: 3, color: X.boss ? '#ff4a4a' : '#ffb04a', label: '▼ ' + X.next.label });
+    if (X.boss) objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: 'pboss', floor: X.floor });
+    if (!X.next) objs.push({ k: 'bigcrystal', x: ex, z: ez - 1, color: '#ff3a3a' });
+  } else objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: lvl === 0 ? 'town' : mapId(act, lvl - 1), tx: lvl === 0 ? 15 : -2, tz: lvl === 0 ? 22 : -2, dir: lvl === 0 ? 'up' : 'down', label: backN.slice(2) }, { k: 'gate', x: sx - 1, z: sz + 2, w: 3, color: '#6ab8ff', label: backN, back: true });
+  if (!X && !last) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: mapId(act, lvl + 1), tx: -1, tz: -1, dir: 'up', label: nextN.slice(2) }, { k: 'gate', x: ex - 1, z: ez - 2, w: 3, color: '#ffb04a', label: nextN });
+  else if (!X) { objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: 'boss', act }); objs.push({ k: 'bigcrystal', x: ex, z: ez - 1, color: '#b06aff' }); }
+  if (!X && WP_LEVELS.includes(lvl)) objs.push({ k: 'crystal', x: sx + 2, z: sz - 1 });
   // dark places get torches along the way
   if (THEMES[theme]?.night) pts.forEach(([x, z], i) => { const tx = x + (r() < 0.5 ? -3 : 3), tz = z + (r() < 0.5 ? -1 : 1); if (m.grid[tz]?.[tx] && m.grid[tz][tx] !== '#') objs.push({ k: 'torch', x: tx, z: tz }); });
   const pick = (a) => a[Math.floor(r() * a.length)];
-  chests.forEach(([x, z], i) => objs.push(boxObj(pick(L.box || ['chest']), { x, z, id: `${id}_${seed}_${i}`, loot: areaLevel(S, act, lvl), item: null, big: true })));
+  chests.forEach(([x, z], i) => objs.push(boxObj(pick(L.box || ['chest']), { x, z, id: `${id}_${seed}_${i}`, loot: lv, item: null, big: true })));
   // a shrine (a buff) on some levels
   if (r() < 0.5) { const [x, z] = pts[1 + Math.floor(r() * (n - 2))]; objs.push({ k: 'statue', x: x + 2, z, id: `shrine_${seed}`, weapon: 'staff', hair: 'long', shrine: ['exp', 'atk', 'def', 'mf'][Math.floor(r() * 4)] }); }
-  const lv = areaLevel(S, act, lvl);
   // what lies about, and the small things to search: never on top of something else, and never walling off a passage
   // (anything solid goes only where all eight neighbours are open floor, and keeps its distance from other solid things)
   const FLOOR = '.,:', taken = new Set(), solid = [];
@@ -162,11 +167,31 @@ export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9)) {
     }
   }
   MAPS[id] = {
-    name: `${name}　Lv${lv}`, theme, ...m, objs, seed, act, lvl, hab, bg: L.bg, alv: lv, bright: L.bright ?? { mine: 3, temple: 2.0, templeYard: 2.0, templeHall: 2.0, templeDeep: 2.0, skyDark: 1.8 }[theme],
+    name: `${name}　Lv${lv}`, theme, ...m, objs, seed, act, lvl, hab, ...(X ? { floor: X.floor, pw: X.pw, lootQ: X.lootQ } : {}), bg: L.bg, alv: lv, bright: L.bright ?? { mine: 3, temple: 2.0, templeYard: 2.0, templeHall: 2.0, templeDeep: 2.0, skyDark: 1.8 }[theme],
     enc: { troops: [['slime']], lv }, encRate: 22,
     spawn: [sx, sz, 'up'], exitSpawn: [ex, ez + 1, 'down'],
   };
   return MAPS[id];
+}
+
+// ---------------------------------------------------------------- the Dead King's palace
+// Opens once the hell difficulty is beaten: a hundred floors, stronger every floor, richer every floor. A guardian
+// waits on every tenth floor (the act bosses again, far stronger), the Dead King himself on the hundredth. Every floor
+// has a way back to the surface; die down there and you lose experience, gold and half of what you found on the way.
+export const PALACE_N = 100;
+export const palaceId = (f) => `p${f}`;
+export const parsePalace = (id) => { const m = /^p(\d+)$/.exec(id || ''); return m ? +m[1] : 0; };
+export const palacePower = (f) => ({ hp: 1 + f * 0.04, atk: 1 + f * 0.015, def: 1 + f * 0.006 }); // floor 100: HP x5, attack x2.5
+export const palaceLootQ = (f) => 1.5 + f * 0.035; // how much likelier the good things are: floor 1 x1.5, floor 100 x5
+export const palaceBoss = (f) => f >= PALACE_N ? 'deadking' : ACTS[(f / 10 - 1) % ACTS.length].boss;
+ENEMIES.deadking = { ...ENEMIES.abyss, name: '死王', kind: 'lord', colors: { body: '#2a1a1e', trim: '#e8c050', halo: '#ff4a3a', eye: '#ff3a3a' }, weak: ['light', 'fire', 'sword'], resist: ['dark', 'ice'], acts: [['e_void', 2], ['e_dark', 2], ['e_silence_all', 1], ['e_tidal', 1]], exp: 40000, gil: 50000, drops: [], scale: 1.5, twice: 1 };
+const PAL_LOOK = ['4_2', '0_3', '4_0', '2_3', '4_1'], PAL_HAB = ['cave', 'temple', 'void', 'forest', 'mountain', 'coast', 'sky'];
+export function genPalace(S, f, seed) {
+  const look = LOOK[PAL_LOOK[Math.min(4, Math.floor((f - 1) / 20))]];
+  return genLevel(S, 4, 0, seed, {
+    id: palaceId(f), name: `死王宮殿　第${f}層`, theme: 'skyDark', hab: PAL_HAB[f % PAL_HAB.length], look, lv: 99, floor: f, pw: palacePower(f), lootQ: palaceLootQ(f),
+    boss: f % 10 === 0 ? palaceBoss(f) : null, back: { to: 'town', tx: 15, tz: 22, dir: 'up', label: '返回地面（營地）' }, next: f < PALACE_N ? { to: palaceId(f + 1), label: `下一層：第${f + 1}層` } : null,
+  });
 }
 
 // ---------------------------------------------------------------- who lives there
