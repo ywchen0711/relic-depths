@@ -397,6 +397,44 @@ export function buildMap(scene, map, theme) {
         if (m.broken) pm.scale.y = 0.5, pm.position.y = y + (m.h || 3) / 4;
         c.block = true; break;
       }
+      case 'gate': {
+        // a stone archway with a swirling portal: the way to the next (or previous) level, with its name above it
+        const col = m.color || '#ffb04a', g = new THREE.Group(), stone = std(tileTex('stonewall', m.stone || '#8a8278'));
+        if (!m.back) for (const sx of [-1.35, 1.35]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.42, 2.6, 0.42), stone); p.position.set(sx, 1.3, 0); p.castShadow = true; g.add(p); const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.6), stone); cap.position.set(sx, 2.66, 0); g.add(cap); }
+        if (!m.back) { const lintel = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, 0.5), stone); lintel.position.set(0, 2.9, 0); lintel.castShadow = true; g.add(lintel); }
+        const pc = document.createElement('canvas'); pc.width = pc.height = 128; const pg = pc.getContext('2d'); const gr = pg.createRadialGradient(64, 64, 4, 64, 64, 64); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.35, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); pg.fillStyle = gr; pg.fillRect(0, 0, 128, 128);
+        pg.strokeStyle = 'rgba(255,255,255,0.7)'; pg.lineWidth = 3; for (let i = 0; i < 3; i++) { pg.beginPath(); for (let a = 0; a < 6; a += 0.1) { const r = 6 + a * 9; pg.lineTo(64 + Math.cos(a + i * 2.1) * r, 64 + Math.sin(a + i * 2.1) * r); } pg.stroke(); }
+        const pmat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(pc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+        const portal = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 2.5), pmat); portal.position.set(0, 1.3, 0); g.add(portal);
+        if (m.back) { portal.geometry = new THREE.CircleGeometry(1.45, 40); portal.rotation.x = -Math.PI / 2; portal.position.set(0, 0.06, 0); }
+        const floor = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false })); floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0.03, 0.6); g.add(floor);
+        const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.6, 4), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.2 })); arrow.rotation.x = Math.PI; arrow.position.set(0, 3.7, 0); g.add(arrow);
+        if (m.back) arrow.position.set(0, 1.9, 0);
+        if (m.label) { const lc = document.createElement('canvas'); lc.width = 512; lc.height = 96; const lg = lc.getContext('2d'); lg.font = 'bold 44px sans-serif'; lg.textAlign = 'center'; lg.textBaseline = 'middle'; lg.lineWidth = 8; lg.strokeStyle = 'rgba(0,0,0,0.85)'; lg.strokeText(m.label, 256, 48); lg.fillStyle = '#fff4d0'; lg.fillText(m.label, 256, 48); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lc), depthWrite: false, transparent: true })); sp.scale.set(3.6, 0.68, 1); sp.position.set(0, m.back ? 2.6 : 4.45, m.back ? 0.4 : 0); g.add(sp); }
+        g.position.set(c.i + (m.w || 3) / 2, y, cz + (m.back ? 0 : -0.2)); root.add(g);
+        const ay = m.back ? 1.9 : 3.7;
+        anims.push((t) => { portal.rotation.z = -t * 1.2; arrow.position.y = ay + Math.sin(t * 3) * 0.15; arrow.rotation.y = t * 1.5; floor.material.opacity = 0.35 + Math.sin(t * 2.5) * 0.12; });
+        addLight(c.i + (m.w || 3) / 2, y + 1.6, cz + 0.8, col, 9, 9);
+        anims.push({ sparkle: [c.i + (m.w || 3) / 2, y + 1.3, cz, col] });
+        break;
+      }
+      case 'stash': {
+        // the camp's stash: a big iron-bound strongbox with a padlock
+        const g = new THREE.Group(), wood = std(tileTex('wood', '#6a3a1e')), iron = new THREE.MeshStandardMaterial({ color: '#4a4e58', metalness: 0.8, roughness: 0.35 }), gold = new THREE.MeshStandardMaterial({ color: '#e8c050', metalness: 0.85, roughness: 0.25 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.85, 1.0), wood); body.position.y = 0.43; body.castShadow = body.receiveShadow = true; g.add(body);
+        const lid = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.32, 1.1), wood); lid.position.y = 1.0; lid.castShadow = true; g.add(lid);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, 0.85), wood); top.position.y = 1.22; g.add(top);
+        for (const sx of [-0.78, 0, 0.78]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.88, 1.04), iron); b.position.set(sx, 0.44, 0); g.add(b); const bl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 1.14), iron); bl.position.set(sx, 1.0, 0); g.add(bl); }
+        for (const sz of [-0.5, 0.5]) for (const sx of [-0.95, 0.95]) { const cnr = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), gold); cnr.position.set(sx, 0.1, sz); g.add(cnr); const cnt = cnr.clone(); cnt.position.y = 1.1; g.add(cnt); }
+        const lock = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.34, 0.1), gold); lock.position.set(0, 0.72, 0.55); g.add(lock);
+        const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 12, Math.PI), gold); shackle.position.set(0, 0.9, 0.55); g.add(shackle);
+        const keyhole = new THREE.Mesh(new THREE.CircleGeometry(0.045, 8), new THREE.MeshBasicMaterial({ color: '#1a1a1a' })); keyhole.position.set(0, 0.7, 0.605); g.add(keyhole);
+        if (m.label) { const lc = document.createElement('canvas'); lc.width = 256; lc.height = 80; const lg = lc.getContext('2d'); lg.font = 'bold 40px sans-serif'; lg.textAlign = 'center'; lg.textBaseline = 'middle'; lg.lineWidth = 7; lg.strokeStyle = 'rgba(0,0,0,0.8)'; lg.strokeText(m.label, 128, 40); lg.fillStyle = '#ffe8a0'; lg.fillText(m.label, 128, 40); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lc), depthWrite: false, transparent: true })); sp.scale.set(1.9, 0.6, 1); sp.position.set(0, 2.1, 0); g.add(sp); }
+        g.position.set(c.i + 1, y, cz); root.add(g);
+        for (let i = 0; i <= 1; i++) { const cc = map.at(c.i + i, c.j); if (cc) cc.block = true; }
+        interact.push({ c, kind: 'board', id: m.id, w: 2, x0: c.i, x1: c.i + 2 });
+        break;
+      }
       case 'torch': {
         const s = addSprite(propPx('lamp'), cx, cz, y, 0.8);
         s.mat.emissive = new THREE.Color('#ff8a30'); s.mat.emissiveMap = s.tex; s.mat.emissiveIntensity = 1;

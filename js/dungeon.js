@@ -25,7 +25,6 @@ export function areaLevel(S, act, lvl) { return Math.min(99, ACTS[act].lv + lvl 
   g.rect(1, 1, 28, 5, ',');
   g.ell(15, 14, 6, 4, ':');
   g.rect(13, 20, 17, 24, ':');
-  g.scatter(1, 6, 28, 24, 'y', 0.02, ['.'], 3);
   const m = g.done();
   MAPS.town = {
     name: '暮光營地', theme: 'anvil', town: true, ...m, bgm: 'town',
@@ -39,10 +38,11 @@ export function areaLevel(S, act, lvl) { return Math.min(99, ACTS[act].lv + lvl 
       { k: 'npc', x: 14, z: 6, id: 'recruiter', look: 'guard', dir: 'down' },
       { k: 'npc', x: 24, z: 6, id: 'gambler', look: 'lady', dir: 'down' },
       { k: 'npc', x: 20, z: 10, id: 'elder', look: 'oldman', dir: 'left' },
-      { k: 'board', x: 9, z: 12, id: 'stash' },
+      { k: 'stash', x: 8, z: 12, id: 'stash', label: '倉庫' },
       { k: 'lamp', x: 11, z: 11 }, { k: 'lamp', x: 19, z: 11 }, { k: 'lamp', x: 11, z: 17 }, { k: 'lamp', x: 19, z: 17 },
       { k: 'barrel', x: 3, z: 8 }, { k: 'crate', x: 4, z: 9 }, { k: 'barrel', x: 26, z: 8 }, { k: 'flowers', x: 7, z: 15 }, { k: 'flowers', x: 23, z: 15 },
-      { k: 'warp', x: 13, z: 24, w: 5, d: 1, to: mapId(0, 0), tx: -1, tz: -1, dir: 'up' },
+      { k: 'warp', x: 13, z: 24, w: 5, d: 1, to: mapId(0, 0), tx: -1, tz: -1, dir: 'up', label: '前往地城' },
+      { k: 'gate', x: 13, z: 23, w: 5, color: '#ffb04a', label: '▼ 前往地城：荒野', back: true },
     ],
     spawn: [15, 18, 'down'],
   };
@@ -75,8 +75,9 @@ export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9)) {
   const [sx, sz] = pts[0], [ex, ez] = pts[n - 1], last = lvl === 3;
   const id = mapId(act, lvl), objs = [];
   // the way back and the way on
-  objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: lvl === 0 ? 'town' : mapId(act, lvl - 1), tx: lvl === 0 ? 15 : -2, tz: lvl === 0 ? 22 : -2, dir: lvl === 0 ? 'up' : 'down' });
-  if (!last) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: mapId(act, lvl + 1), tx: -1, tz: -1, dir: 'up' }, { k: 'torch', x: ex - 2, z: ez - 2 }, { k: 'torch', x: ex + 2, z: ez - 2 });
+  const backN = lvl === 0 ? '▲ 返回營地' : `▲ 上一層：${A.levels[lvl - 1][0]}`, nextN = `▼ 下一層：${A.levels[lvl + 1]?.[0] || ''}`;
+  objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: lvl === 0 ? 'town' : mapId(act, lvl - 1), tx: lvl === 0 ? 15 : -2, tz: lvl === 0 ? 22 : -2, dir: lvl === 0 ? 'up' : 'down', label: backN.slice(2) }, { k: 'gate', x: sx - 1, z: sz + 2, w: 3, color: '#6ab8ff', label: backN, back: true });
+  if (!last) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: mapId(act, lvl + 1), tx: -1, tz: -1, dir: 'up', label: nextN.slice(2) }, { k: 'gate', x: ex - 1, z: ez - 2, w: 3, color: '#ffb04a', label: nextN });
   else { objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: 'boss', act }); objs.push({ k: 'bigcrystal', x: ex, z: ez - 1, color: '#b06aff' }); }
   if (WP_LEVELS.includes(lvl)) objs.push({ k: 'crystal', x: sx + 2, z: sz - 1 });
   // dark places get torches along the way
