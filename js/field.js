@@ -7,6 +7,7 @@ import { isPaper } from './voxel.js?v=1';
 import { personModel } from './paperdoll.js?v=1';
 import { personSheet, Px, ramp, texFrom, propPx } from './pixel.js?v=1';
 import { HEROES, ECHOES } from './data.js?v=1';
+const FAR_VIEW = 1.4; // the field camera is pulled back to show more of the dungeon around the party
 
 export const LIGHTS = {
   day: { sun: ['#fff0d8', 2.7, [0.5, 1, 0.7]], hemi: ['#c4dcff', '#8a7a5a', 1.0], exp: 1.0 },
@@ -54,11 +55,11 @@ export class Field {
     this.camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.1, 600);
     this.sun = new THREE.DirectionalLight('#fff', 2.5);
     this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(this.sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 80 });
+    Object.assign(this.sun.shadow.camera, { left: -28, right: 28, top: 28, bottom: -28, near: 1, far: 90 });
     this.sun.shadow.bias = -0.0008; this.sun.shadow.normalBias = 0.02;
     this.scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight('#fff', '#888', 0.8); this.scene.add(this.hemi);
-    this.pool = []; for (let i = 0; i < 8; i++) { const l = new THREE.PointLight('#ffc070', 0, 8, 1.6); this.scene.add(l); this.pool.push(l); }
+    this.pool = []; for (let i = 0; i < 10; i++) { const l = new THREE.PointLight('#ffc070', 0, 8, 1.6); this.scene.add(l); this.pool.push(l); }
     this.fx = new Particles(this.scene, 500);
     this.t = 0; this.cam = { x: 0, z: 0, y: 0 };
     this.npcs = []; this.player = null; this.map = null;
@@ -82,7 +83,7 @@ export class Field {
     this.built = buildMap(this.scene, this.map, theme);
     // sky
     this.sky = skyDome(theme.sky[0], theme.sky[1]); this.scene.add(this.sky);
-    this.scene.fog = theme.fog ? new THREE.Fog(theme.fog[0], theme.fog[1], theme.fog[2]) : null;
+    this.scene.fog = theme.fog ? new THREE.Fog(theme.fog[0], theme.fog[1] * FAR_VIEW, theme.fog[2] * FAR_VIEW) : null; // the camera sits further back, so the fog does too
     if (theme.clouds) {
       const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
       g.fillStyle = '#e8e0f8'; g.fillRect(0, 0, 256, 256);
@@ -297,7 +298,7 @@ export class Field {
     for (const a of ['x', 'y', 'z']) { const d = p[a] - this.cam[a]; this.cam[a] = Math.abs(d) < 0.003 ? p[a] : this.cam[a] + d * k; }
     { const d = this.yaw - this.yawCur; if (Math.abs(d) < 0.001) this.yawCur = this.yaw; }
     const far = this.world ? (this.mount === 'airship' ? 1.5 : 1.15) : this.def.interior ? 0.85 : 1;
-    const dist = (this.world ? 14.5 : 15.5) * far * (this.zoom || 1) * (this.fit || 1), pitch = this.world ? 0.9 : 0.86;
+    const dist = (this.world ? 14.5 : 15.5) * far * FAR_VIEW * (this.zoom || 1) * (this.fit || 1), pitch = this.world ? 0.9 : 0.86;
     const hd = Math.cos(pitch) * dist, sy = Math.sin(this.yawCur), cy = Math.cos(this.yawCur);
     this.camera.position.set(this.cam.x + sy * hd, this.cam.y + Math.sin(pitch) * dist + 0.8, this.cam.z + cy * hd);
     this.camera.lookAt(this.cam.x - sy * 0.4, this.cam.y + 0.9, this.cam.z - cy * 0.4);
@@ -311,7 +312,7 @@ export class Field {
     const sorted = L.map(l => [l, (l.x - cx) ** 2 + (l.z - cz) ** 2]).sort((a, b) => a[1] - b[1]);
     for (let i = 0; i < this.pool.length; i++) {
       const pl = this.pool[i], e = sorted[i];
-      if (e && e[1] < 600) { const l = e[0]; pl.position.set(l.x, l.y, l.z); pl.color.set(l.color); pl.distance = l.dist; pl.intensity = l.intensity * 0.92; }
+      if (e && e[1] < 1100) { const l = e[0]; pl.position.set(l.x, l.y, l.z); pl.color.set(l.color); pl.distance = l.dist; pl.intensity = l.intensity * 0.92; }
       else pl.intensity = 0;
     }
   }

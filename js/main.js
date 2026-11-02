@@ -86,7 +86,7 @@ class Game {
       if (this.grind && !busy && Math.hypot(this.input.axis.x, this.input.axis.y) > 0.3) this.grind.stop('你停止了自動練功');
       this.field.update(dt, busy ? { axis: { x: 0, y: 0 }, run: false } : this.grind ? this.grind.input(dt) : this.input);
       if (this.mode === 'title') this.titleCam(dt);
-      this.draw(this.field.scene, this.field.camera, this.field.world ? 0.5 : 0.52, this.field.world ? 0.2 : 0.17, this.field.world ? 2.6 : 2.3);
+      this.draw(this.field.scene, this.field.camera, this.field.world ? 0.5 : 0.52, this.field.world ? 0.2 : 0.28, this.field.world ? 2.6 : 1.6);
     }
     requestAnimationFrame((t) => this.loop(t));
   }

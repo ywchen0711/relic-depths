@@ -1306,7 +1306,7 @@ export class Battle {
     // camera: gentle sway, intro sweep, focus on the actor, zoom for resonance
     const cur = this.current;
     const fx = cur && cur.side !== 'summon' ? (cur.x + (cur.ox || 0)) * 0.15 : 0;
-    const zoom = this.camZoom ? 0.8 : 1;
+    const zoom = (this.camZoom ? 0.8 : 1) * 1.12; // a little wider than Crystal Echoes: bigger packs and minions
     const intro = this.camIntro ? 1.3 : 1;
     { const d = fx - (this.camX ?? 0); this.camX = Math.abs(d) < 0.002 ? fx : (this.camX ?? 0) + d * Math.min(1, dt * 3); }
     const shake = this.camShake > 0 ? (this.camShake -= dt, (Math.random() - 0.5) * this.camShake * 0.6) : 0;
