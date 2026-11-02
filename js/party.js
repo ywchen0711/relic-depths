@@ -2,7 +2,7 @@
 import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, EXP_NEXT, AP_CAP, BOND_EXP, STAR_COST, SUMMONS, ECHO_ORDER } from './data.js?v=1';
 import { APT, WTYPES, ARTS_BY_TYPE, MASTERY_AT, MASTERY_OLD, mergeFx } from './content.js?v=1';
 import { setBonusFx, register } from './loot.js?v=1';
-import { CLASSES, TREES, SKILL_INFO, SKILL_MAX } from './classes.js?v=1';
+import { CLASSES, TREES, SKILL_INFO, SKILL_MAX, SYNERGY } from './classes.js?v=1';
 
 export const EQUIP_SLOTS = ['R', 'L', 'head', 'body', 'arms', 'waist', 'legs', 'feet', 'back', 'acc1', 'acc2'];
 export const SLOT_N = { R: '右手', L: '左手', head: '頭', body: '身體', arms: '手', waist: '腰', legs: '腿', feet: '腳', back: '背', acc1: '飾品1', acc2: '飾品2' };
@@ -124,11 +124,13 @@ export function apCap(S, id) { return AP_CAP(S.heroes[id].lv); }
 // skills: own (by level) + echo (by bond and star)
 export function skillsOf(S, id) {
   const out = [];
-  for (const t of TREES[id] || []) for (const sid of t.skills) { const lv = skillLv(S, id, sid); if (lv > 0 && !SKILL_INFO[sid].passive) out.push(`${sid}@${lv}`); }
+  for (const t of TREES[id] || []) for (const sid of t.skills) { const lv = skillLv(S, id, sid); if (lv > 0 && !SKILL_INFO[sid].passive) { const syn = synergyOf(S, id, sid); out.push(`${sid}@${lv}${syn ? '~' + syn : ''}`); } }
   return { own: out, echo: [] };
 }
 // a skill's level: the points put in it, plus +skills from gear (only once it has a point)
 function gearOnlyFx(S, id) { const h = S.heroes[id]; let fx = {}; for (const slot of EQUIP_SLOTS) { const g = GEAR[h.equip[slot]]; if (g?.fx) fx = mergeFx(fx, g.fx); } for (const f of setBonusFx(EQUIP_SLOTS.map(sl => h.equip[sl]).filter(Boolean)).fx) fx = mergeFx(fx, f); return fx; }
+// synergy: every point in the tree's other skills makes this one stronger (percent, up to +100%)
+export function synergyOf(S, id, sid) { const I = SKILL_INFO[sid], h = S.heroes[id]; let n = 0; for (const o of TREES[id][I.tree].skills) if (o !== sid) n += h.pts?.[o] || 0; return Math.min(60, Math.round(n * SYNERGY * 100)); }
 export function skillBonus(S, id) { const fx = gearOnlyFx(S, id); return (fx.skillAll || 0) + (fx.skillCls?.[id] || 0); }
 export function skillLv(S, id, sid) { const n = S.heroes[id].pts?.[sid] || 0; return n > 0 ? Math.min(SKILL_MAX + 10, n + skillBonus(S, id)) : 0; }
 // can a point go into this skill now? ('' means yes)
@@ -136,7 +138,7 @@ export function canLearn(S, id, sid) {
   const h = S.heroes[id], I = SKILL_INFO[sid]; if (!I || I.cls !== id) return '不是這個職業的技能';
   if ((h.pts?.[sid] || 0) >= SKILL_MAX) return '已經是最高等級';
   if (h.lv < I.req) return `需要等級 ${I.req}`;
-  if (I.k > 0) { const prev = TREES[id][I.tree].skills[I.k - 1]; if (!(h.pts?.[prev] > 0)) return '需要先學會前一個技能'; }
+  const miss = (I.pre || []).filter(p => !(h.pts?.[p] > 0)); if (miss.length) return `需要先學會「${miss.map(p => SKILLS[p].name).join('、')}」`;
   if ((h.sp || 0) <= 0) return '沒有技能點數';
   return '';
 }

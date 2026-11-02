@@ -2,7 +2,7 @@
 // the waypoints. They are added to the UI class from ui.js so they share its chooser and tooltips.
 import { UI, fullSprite, portrait } from './ui.js?v=1';
 import { HEROES, SKILLS, GEAR, ITEMS, ELEM } from './data.js?v=1';
-import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx } from './party.js?v=1';
+import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx } from './party.js?v=1';
 import { CLASSES, CLASS_ORDER, TREES, SKILL_INFO, SKILL_MAX, TREE_REQ } from './classes.js?v=1';
 import { RARITY, rollItem, gambleItem, shopStock, sellPrice, dropLoot } from './loot.js?v=1';
 import { ACTS, DIFFS, WP_LEVELS, mapId } from './dungeon.js?v=1';
@@ -34,8 +34,9 @@ P.classHTML = function (c) {
 P.skillText = function (id, sid, lv) {
   const I = SKILL_INFO[sid], B = SKILLS[sid];
   if (I.passive) { const f = (n) => fxText(I.fxAt(n)).join('、') || I.desc; return `<div>${I.desc}</div>${lv ? `<div>目前（Lv${lv}）：${f(lv)}</div>` : ''}<div class="dim">下一級（Lv${lv + 1}）：${f(lv + 1)}</div>`; }
-  const show = (n) => { const S = SKILLS[`${sid}@${n}`]; const bits = []; if (S.pow) bits.push(`威力 ×${S.pow.toFixed(2)}${S.hits > 1 ? ` ×${S.hits}次` : ''}`); if (S.base) bits.push(`+${S.base}`); if (S.chance) bits.push(`機率 ${Math.round(S.chance * 100)}%`); if (S.revive) bits.push(`復活 ${Math.round(S.revive * 100)}%HP`); if (S.buff) bits.push(Object.entries(S.buff).map(([k, v]) => `${({ atk: '攻', def: '防', mag: '魔', spr: '精', spd: '速' })[k]}+${v}`).join(' ')); bits.push(`MP ${S.mp || 0}`); return bits.join('　'); };
-  return `<div>${B.desc || ''}（${TGT_N[B.tgt] || ''}${B.el ? '・' + [].concat(B.el).map(e => ELEM[e]).join('') + '屬性' : ''}）</div>${lv ? `<div>目前（Lv${lv}）：${show(lv)}</div>` : ''}<div class="dim">下一級（Lv${lv + 1}）：${show(lv + 1)}</div>`;
+  const syn = synergyOf(this.S, id, sid), show = (n) => { const S = SKILLS[`${sid}@${n}${syn ? '~' + syn : ''}`]; const bits = []; if (S.pow) bits.push(`威力 ×${S.pow.toFixed(2)}${S.hits > 1 ? ` ×${S.hits}次` : ''}`); if (S.base) bits.push(`+${S.base}`); if (S.chance) bits.push(`機率 ${Math.round(S.chance * 100)}%`); if (S.revive) bits.push(`復活 ${Math.round(S.revive * 100)}%HP`); if (S.buff) bits.push(Object.entries(S.buff).map(([k, v]) => `${({ atk: '攻', def: '防', mag: '魔', spr: '精', spd: '速' })[k]}+${v}`).join(' ')); bits.push(`MP ${S.mp || 0}`); return bits.join('　'); };
+  const pre = SKILL_INFO[sid].pre.map(p => SKILLS[p].name);
+  return `<div>${B.desc || ''}（${TGT_N[B.tgt] || ''}${B.el ? '・' + [].concat(B.el).map(e => ELEM[e]).join('') + '屬性' : ''}）</div>${lv ? `<div>目前（Lv${lv}）：${show(lv)}</div>` : ''}<div class="dim">下一級（Lv${lv + 1}）：${show(lv + 1)}</div>${B.pow || B.base ? `<div style="color:#9ab8ff">協同加成 +${syn}%（這棵樹其他技能每1點 +3%，最多 +60%）</div>` : ''}<div class="dim">需要 Lv${SKILL_INFO[sid].req}${pre.length ? '・先學會「' + pre.join('、') + '」' : ''}</div>`;
 };
 P.skillTreeMenu = async function (pre) {
   const S = this.S; let id = pre || await this.heroPick('技能樹', true); if (!id) return;
@@ -45,7 +46,7 @@ P.skillTreeMenu = async function (pre) {
     const spent = (t) => t.skills.reduce((a, s) => a + (h.pts?.[s] || 0), 0);
     const i = await this.choose(trees.map(t => ({ label: `${t.icon} ${t.name}`, sub: `${spent(t)} 點` })), {
       title: `${HEROES[id].name} 的技能樹　剩餘點數 <b style="color:#ffe04a">${h.sp || 0}</b>　<small>◀ ▶ 換人</small>`, start: ts, cls: 'statushub',
-      info: (k) => `<div class="st-sk">${trees[k].skills.map((sid, j) => { const n = h.pts?.[sid] || 0, lv = skillLv(S, id, sid); return `<div style="margin:4px 0;opacity:${n || !canLearn(S, id, sid) || canLearn(S, id, sid) === '沒有技能點數' ? 1 : 0.55}"><b>${j + 1}. ${SKILLS[sid].name}</b> ${SKILL_INFO[sid].passive ? '<small>（被動）</small>' : ''}　<span style="color:#ffe04a">${n}/${SKILL_MAX}</span>${lv > n ? ` <small style="color:#9ab8ff">（+${lv - n}）</small>` : ''}　<small class="dim">需要 Lv${TREE_REQ[j]}</small><br><small>${SKILL_INFO[sid].desc || SKILLS[sid].desc || ''}</small></div>`; }).join('')}</div>`,
+      info: (k) => `<div class="st-sk">${trees[k].skills.map((sid, j) => { const n = h.pts?.[sid] || 0, lv = skillLv(S, id, sid); return `<div style="margin:4px 0;opacity:${n || !canLearn(S, id, sid) || canLearn(S, id, sid) === '沒有技能點數' ? 1 : 0.55}"><b>${j + 1}. ${SKILLS[sid].name}</b> ${SKILL_INFO[sid].passive ? '<small>（被動）</small>' : ''}　<span style="color:#ffe04a">${n}/${SKILL_MAX}</span>${lv > n ? ` <small style="color:#9ab8ff">（+${lv - n}）</small>` : ''}　<small class="dim">需要 Lv${SKILL_INFO[sid].req}</small><br><small>${SKILL_INFO[sid].desc || SKILLS[sid].desc || ''}</small></div>`; }).join('')}</div>`,
       lr: (k, d) => { id = all[(all.indexOf(id) + d + all.length) % all.length]; ts = k; return 'close'; },
     });
     if (i === -2) continue;
@@ -198,7 +199,7 @@ P.hireMenu = async function () {
 };
 // spend a hired hero's points: two trees of real skills, stats by what the class lives on
 export function autoBuild(S, id) {
-  const AUTO = { barb: [0, 4], paladin: [1, 0], sorc: [0, 1], necro: [0, 5], ranger: [0, 1], assassin: [0, 2], druid: [0, 1], monk: [0, 5], bard: [3, 4], gunner: [0, 1] };
+  const AUTO = { barb: [0, 4], paladin: [1, 0], sorc: [0, 1], necro: [4, 0], ranger: [0, 1], assassin: [0, 2], druid: [0, 1], monk: [0, 5], bard: [3, 4], gunner: [0, 1] };
   const h = S.heroes[id], trees = (AUTO[id] || [0, 1]).map(i => TREES[id][i]);
   let guard = 200;
   while ((h.sp || 0) > 0 && guard-- > 0) {

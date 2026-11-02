@@ -254,13 +254,16 @@ function make(style, th, k, cls) {
       P((lv) => ({ drain: lin(0.04, 0.012)(lv), killHeal: lin(0.04, 0.01)(lv) }), '被動：吸血、擊倒敵人時回復'),
       mag({ mp: 32, pow: 2.0, tgt: 'enemies', el: 'dark', desc: '強大的闇屬性全體魔法' }),
     ];
-    case 'summon': return [
-      mag({ mp: 6, pow: 0.55, hits: 3, tgt: 'random', desc: '召喚物隨機三連擊' }),
-      mag({ mp: 9, pow: 0.8, hits: 2, tgt: 'random', status: st, chance: 0.3, desc: '召喚物攻擊並附加異常' }),
-      mag({ mp: 15, pow: 0.5, hits: 6, tgt: 'random', desc: '召喚軍團隨機六連擊' }),
-      P((lv) => ({ magP: lin(0.05, 0.02)(lv), hpP: lin(0.03, 0.01)(lv) }), '被動：召喚物更強、自身HP提升'),
-      mag({ mp: 34, pow: 1.6, hits: 2, tgt: 'enemies', desc: '巨大召喚物攻擊全體兩次' }),
-    ];
+    case 'summon': { // minions that stay with the party from battle to battle until they fall
+      const M = MINIONS[`${cls}_${CLASSES[cls].trees.findIndex(t => t[0] === 'summon')}`];
+      return [
+        { type: 'special', tgt: 'self', school: 'class', minion: 'A', mp: 6, desc: `召喚${M.A.n}：會一直跟著隊伍戰鬥，直到倒下（等級越高可以同時召喚越多）` },
+        { type: 'special', tgt: 'self', school: 'class', minion: 'B', mp: 9, desc: `召喚${M.B.n}：${M.B.mag ? '用魔法攻擊' : '迅捷的攻擊手'}，持續到倒下` },
+        { type: 'special', tgt: 'self', school: 'class', minionAll: true, mp: 12, desc: '號令所有召喚物立刻對全體敵人發動攻擊' },
+        P((lv) => ({ minionUp: lin(0.1, 0.035)(lv), hpP: lin(0.02, 0.008)(lv) }), '被動：召喚物的HP與攻擊提升'),
+        { type: 'special', tgt: 'self', school: 'class', minion: 'C', mp: 20, desc: `召喚${M.C.n}：強大的巨型召喚物（一次一隻），持續到倒下` },
+      ];
+    }
     case 'burst': return [
       mag({ mp: 6, pow: 1.3, burst: true, desc: '引爆敵人身上的異常，越多越痛' }),
       mag({ mp: 9, pow: 1.0, chain: 2, desc: '彈跳兩次的連鎖爆炸' }),
@@ -349,23 +352,87 @@ function make(style, th, k, cls) {
   }
 }
 
+// ---------------------------------------------------------------- the deeper half of every tree
+// slot 5: a variant of the first skill with another mechanic (lv3); slot 6: a field, stance or support (lv18);
+// slot 7: the keystone (lv30), a passive that changes how the tree plays
+export const SLOT_ORDER = [0, 5, 1, 2, 3, 6, 4, 7];
+export const REQ_OF = { 0: 1, 5: 3, 1: 6, 2: 12, 3: 12, 6: 18, 4: 24, 7: 30 };
+export const PRE_OF = { 0: [], 5: [0], 1: [0], 2: [5], 3: [1], 6: [1], 4: [2], 7: [4] };
+export const SYNERGY = 0.03; // +3% to a skill per point in each other skill of the same tree (up to +60%)
+const EW = { fire: '炎', ice: '冰', thunder: '雷', water: '水', wind: '風', earth: '岩', light: '聖', dark: '闇' };
+const WW = { axe: '斧', sword: '劍', greatsword: '大劍', hammer: '鎚', spear: '槍', bow: '弓', gun: '槍', dagger: '刃', katana: '刀', knuckle: '拳', whip: '鞭', boomerang: '迴旋', staff: '杖', rod: '杖', harp: '琴', tome: '書', shield: '盾' };
+export const MINIONS = {
+  necro_4: { w: '亡者', A: { n: '骷髏戰士', kind: 'skeleton', hp: 0.55, atk: 0.6, act: 'mn_claw' }, B: { n: '骷髏法師', kind: 'mage', hp: 0.4, atk: 0.65, act: 'mn_bolt_dark', mag: true }, C: { n: '屍骨巨人', kind: 'golem', hp: 1.7, atk: 0.95, act: 'mn_smash', big: true } },
+  ranger_6: { w: '精靈', A: { n: '森林精靈', kind: 'wisp', hp: 0.4, atk: 0.6, act: 'mn_bolt_light', mag: true }, B: { n: '獵鷹', kind: 'bird', hp: 0.45, atk: 0.7, act: 'mn_claw' }, C: { n: '女武神', kind: 'knight', hp: 1.5, atk: 1.0, act: 'mn_smash', big: true } },
+  druid_5: { w: '野獸', A: { n: '烏鴉', kind: 'bird', hp: 0.35, atk: 0.55, act: 'mn_claw' }, B: { n: '野狼', kind: 'wolf', hp: 0.6, atk: 0.75, act: 'mn_bite' }, C: { n: '巨熊', kind: 'beast', hp: 1.8, atk: 1.0, act: 'mn_smash', big: true } },
+  gunner_3: { w: '機械', A: { n: '小砲台', kind: 'mech', hp: 0.5, atk: 0.6, act: 'mn_bolt_thunder', mag: true }, B: { n: '機械蜂', kind: 'eye', hp: 0.35, atk: 0.7, act: 'mn_claw' }, C: { n: '巨神兵', kind: 'golem', hp: 1.8, atk: 1.0, act: 'mn_smash', big: true } },
+};
+for (const [id, o] of Object.entries({ mn_claw: { name: '攻擊', type: 'phys', pow: 1.0, anim: 'claw' }, mn_bite: { name: '撕咬', type: 'phys', pow: 1.1, anim: 'bite' }, mn_smash: { name: '重擊', type: 'phys', pow: 1.35, anim: 'slash' } })) SKILLS[id] = { tgt: 'enemy', mp: 0, ...o };
+for (const e of ELS) SKILLS['mn_bolt_' + e] = { name: ELEM[e] + '彈', type: 'mag', tgt: 'enemy', pow: 1.0, el: e, anim: EL_ANIM[e], mp: 0 };
+const AURA_N = { auraatk: ['激勵', '戰陣', '王者之風'], auradef: ['守護之誓', '聖盾陣', '聖域之心'], auraspd: ['疾風之誓', '流水陣', '天人之心'], songatk: ['獨唱', '輪唱', '天籟'], songdef: ['守護獨唱', '和聲之陣', '安息天籟'], warcryatk: ['怒吼', '戰陣', '戰神之風'] };
+function extraSlots(style, th, cls, ti) {
+  const el = W_EL(th), C = CLASSES[cls], wpn = WW[th] ? th : C.wpn, custom = C.trees[ti][4];
+  // the word the new skills are named after: the tree's own theme, so two trees never share names
+  const SW = { curse: '詛咒', venom: '毒', blood: '血', soul: '魂', burst: '屍爆', bomb: '爆破', trap: '陷阱', time: '時空', arcane: '奧術', quake: '大地', rage: '狂怒', guard: '盾', shadow: '影', throw: '飛刃' };
+  const X = custom ? custom.replace(/系魔法|魔法|召喚|術$|法$|化$/g, '') || custom : style === 'spell' ? ELEM[el] : (style === 'blade' || style === 'beast') ? WW[th] || ELEM[el] : style === 'ranged' ? (WW[th] || ELEM[el] + '矢') : SW[style] || (el ? EW[el] : WW[th] || '');
+  const phys = (o) => ({ type: 'phys', tgt: 'enemy', wpn, art: wpn, ...(el ? { el } : {}), ...o });
+  const mag = (o) => ({ type: 'mag', tgt: 'enemy', school: 'class', anim: EL_ANIM[el] || 'holy', ...(el ? { el } : {}), ...o });
+  const offense = ['blade', 'beast', 'throw', 'ranged', 'quake', 'rage', 'shadow', 'guard'];
+  const spelly = ['spell', 'arcane', 'burst', 'bomb', 'trap', 'blood', 'soul', 'time'];
+  if (style === 'summon') { const M = MINIONS[`${cls}_${ti}`]; return [
+    [`${M.w}號令`, { type: 'buff', tgt: 'allies', school: 'white', buff: { atk: 1, spd: 1 }, mp: 8, desc: '全隊與所有召喚物的攻擊、速度提升' }],
+    [`${M.w}再生`, { type: 'heal', tgt: 'allies', school: 'white', pow: 0.8, base: 40, mp: 14, desc: '回復全隊與所有召喚物的HP' }],
+    [`${M.w}之王`, P((lv) => ({ minionUp: lin(0.3, 0.025)(lv), minionCap: 1, magP: lin(0.05, 0.01)(lv) }), '核心（被動）：召喚物大幅變強，每種可以多召喚一隻')]]; }
+  if (offense.includes(style)) return [
+    [`${X}連擊`, phys({ mp: 4, pow: 0.75, hits: 2, pierce2: true, ranged: style === 'ranged' || style === 'throw' || undefined, desc: '兩連擊，每一擊都會穿透到另一名敵人' })],
+    [`${X}架勢`, { type: 'buff', tgt: 'self', buff: { atk: 2, spd: 1 }, stance: style === 'guard' ? 'wall' : 'parry', mp: 10, desc: '提升自身攻擊與速度，並擺出架勢擋開攻擊' }],
+    [`${X}奧義`, P((lv) => ({ crit: lin(0.08, 0.008)(lv), dbl: lin(0.08, 0.008)(lv), lowhp: 0.3, atkP: lin(0.1, 0.012)(lv), brk: 0.15 }), '奧義（被動）：會心、連擊、破防大幅提升，HP越低越強')]];
+  if (spelly.includes(style)) return [
+    [`${X}之印`, el ? mag({ mp: 5, pow: 0.7, mark: el, desc: `小傷害並留下印記：3回合內下一次${ELEM[el]}屬性攻擊×1.5` }) : mag({ mp: 5, pow: 0.9, chain: 2, desc: '彈跳兩次的連鎖魔法' })],
+    [el ? `${X}之領域` : `${X}陣`, { type: 'special', tgt: 'self', school: 'class', field: el || 'haste', mp: 16, desc: el ? `把戰場變成${ELEM[el]}屬性領域3回合：${ELEM[el]}屬性傷害×1.4` : '3回合內全隊速度×1.3' }],
+    [`${X}之心`, P((lv) => ({ ...(el ? { elUp: { [el]: lin(0.3, 0.02)(lv) } } : { magP: lin(0.1, 0.01)(lv) }), dualcast: lin(0.1, 0.008)(lv), magP: lin(0.08, 0.01)(lv), markAmp: 0.3, mpcost: 0.1 }), '核心（被動）：傷害大增、機率連續詠唱、印記更強')]];
+  if (style === 'curse' || style === 'venom') return [
+    [`${X}烙印`, { type: 'debuff', tgt: 'enemy', school: 'curse', unresist: true, mp: 6, desc: '3回合內消除敵人的抗性與重甲' }],
+    [X.endsWith('霧') ? `${X}瀰漫` : `${X}之霧`, { type: 'debuff', tgt: 'enemies', school: 'curse', dispel: true, debuff: { spd: 1 }, mp: 12, desc: '驅散敵全體的強化，並降低速度' }],
+    [`${X}之核`, P((lv) => ({ onHitP: lin(0.15, 0.01)(lv), magP: lin(0.1, 0.01)(lv), killHeal: 0.06, burnAmp: 1 }), '核心（被動）：攻擊大多附帶異常，擊倒敵人時回復')]];
+  if (style === 'heal' || style === 'potion') return [
+    [`${X || '生命'}之恩`, { type: 'heal', tgt: 'ally', school: 'white', pow: 0.9, base: 25, regenAdd: 3, mp: 3, desc: '小回復並再生3回合' }],
+    [`${X || '生命'}聖域`, { type: 'buff', tgt: 'allies', school: 'white', buff: { def: 1, spr: 1 }, regen: 2, mp: 14, desc: '全隊防禦精神提升並再生' }],
+    [`${X || '生命'}之心`, P((lv) => ({ healup: lin(0.4, 0.02)(lv), auto: ['regen'], mpregen: 0.03, hpP: 0.05 }), '核心（被動）：回復量大增、戰鬥中自動再生')]];
+  if (style === 'aura' || style === 'song' || style === 'warcry') return [
+    [AURA_N[style + th]?.[0] || '激勵', { type: 'buff', tgt: 'ally', school: 'white', buff: { atk: 2, mag: 2 }, mp: 5, desc: '大幅提升一名隊友的攻擊與魔力' }],
+    [AURA_N[style + th]?.[1] || '戰陣', { type: 'buff', tgt: 'allies', school: 'white', evadeT: 1, buff: { spd: 1 }, mp: 14, desc: '全隊閃開下一次攻擊並加速' }],
+    [AURA_N[style + th]?.[2] || '王者之風', P((lv) => ({ limitup: 0.4, atkP: lin(0.08, 0.008)(lv), magP: lin(0.08, 0.008)(lv), hpP: lin(0.06, 0.006)(lv) }), '核心（被動）：自身全能力提升、極限累積更快')]];
+  // the mostly-passive trees get two actives and a keystone
+  const T = {
+    tough: [['堅守', { type: 'buff', tgt: 'self', taunt: 2, buff: { def: 2 }, mp: 4, desc: '挑釁敵人並提升防禦' }], ['鋼鐵意志', { type: 'buff', tgt: 'allies', buff: { def: 1, spr: 1 }, mp: 12, desc: '全隊防禦與精神提升' }], ['不滅之心', P((lv) => ({ hpP: lin(0.15, 0.01)(lv), resistAll: 0.85, auto: ['regen', 'protect'] }), '核心（被動）：HP大增、所有屬性傷害降低、自動護佑與再生')]],
+    instinct: [['破綻', phys({ mp: 6, pow: 1.6, critUp: 0.3, desc: '看準破綻的一擊，高會心' })], ['戰鬥狂熱', { type: 'buff', tgt: 'self', buff: { atk: 2, spd: 2 }, mp: 12, desc: '大幅提升自身攻擊與速度' }], ['極意', P((lv) => ({ crit: lin(0.1, 0.008)(lv), dbl: lin(0.1, 0.008)(lv), first: 1, counter: 0.15 }), '核心（被動）：會心、連擊、反擊，必定先制')]],
+    evade: [['回旋踢', phys({ mp: 4, pow: 1.1, tgt: 'enemies', el: 'wind', desc: '旋身踢擊全體' })], ['幻影步', { type: 'buff', tgt: 'allies', evadeT: 1, mp: 14, desc: '全隊閃開下一次攻擊' }], ['疾風之心', P((lv) => ({ evade: lin(0.1, 0.006)(lv), dodgeCounter: 1, spdF: 3 }), '核心（被動）：閃避大增，閃開後必定反擊')]],
+    eagle: [['標記射擊', phys({ mp: 4, pow: 1.2, ranged: true, markWeak: true, desc: '射擊並在敵人的弱點留下印記' })], ['獵人陷阱', { type: 'debuff', tgt: 'enemies', school: 'curse', debuff: { def: 1, spd: 1 }, mp: 12, desc: '降低敵全體防禦與速度' }], ['鷹之心', P((lv) => ({ crit: lin(0.12, 0.008)(lv), brk: 0.2, revealHit: 1, markAmp: 0.4 }), '核心（被動）：會心大增，印記與破防更強')]],
+    charm: [['幸運一擊', phys({ mp: 4, pow: 1.3, steal: true, desc: '攻擊並偷取道具' })], ['明星光環', { type: 'buff', tgt: 'allies', school: 'song', buff: { atk: 1, mag: 1, spd: 1 }, mp: 12, desc: '全隊攻擊、魔力、速度提升' }], ['傳說', P((lv) => ({ mf: lin(50, 5)(lv), gil: 0.5, exp: 0.15, drop: 0.3 }), '核心（被動）：尋寶率、金幣、經驗大增')]],
+    wizard: [['魔力衝擊', mag({ mp: 6, pow: 1.5, el: undefined, weakEl: true, desc: '自動帶上敵人已知弱點屬性的魔法' })], ['魔力結界', { type: 'buff', tgt: 'self', school: 'white', buff: { mag: 3, spr: 2 }, mp: 12, desc: '大幅提升自身魔力與精神' }], ['大魔導', P((lv) => ({ magP: lin(0.15, 0.01)(lv), dualcast: 0.15, mpcost: 0.2, mpregen: 0.03 }), '核心（被動）：魔力大增、連續詠唱、MP消耗降低')]],
+    meditate: [['氣之掌', phys({ mp: 4, pow: 1.3, el: 'light', mpGain: 6, desc: '光屬性掌擊並回復MP' })], ['心眼', { type: 'buff', tgt: 'self', school: 'white', evadeT: 2, buff: { spr: 2 }, mp: 10, desc: '看穿攻擊：閃開下兩次攻擊' }], ['涅槃之心', P((lv) => ({ auto: ['regen'], mpregen: 0.05, hpP: lin(0.1, 0.008)(lv), healup: 0.3 }), '核心（被動）：自動再生、大量回MP')]],
+  }[style];
+  return T || [[`${X}之技`, phys({ mp: 4, pow: 1.3, desc: '單體攻擊' })], [`${X}之構`, { type: 'buff', tgt: 'self', buff: { atk: 2 }, mp: 10, desc: '提升自身攻擊' }], [`${X}之極`, P((lv) => ({ atkP: lin(0.1, 0.01)(lv) }), '核心（被動）：攻擊大增')]];
+}
+
 // ---------------------------------------------------------------- register everything
 export const TREES = {};      // cls -> [{ id, name, icon, style, skills: [sid x5] }]
 export const SKILL_INFO = {}; // sid -> { cls, tree, k, req, passive, fxAt }
 for (const [cls, C] of Object.entries(CLASSES)) {
   TREES[cls] = C.trees.map(([style, th, names, icon], ti) => {
-    const built = make(style, th, 0, cls), ids = [];
+    const ex = extraSlots(style, th, cls, ti), built = [...make(style, th, 0, cls), ...ex.map(e => e[1])], allNames = [...names, ...ex.map(e => e[0])], ids = [];
     built.forEach((b, k) => {
       const id = `k_${cls}_${ti}_${k}`; ids.push(id);
-      SKILL_INFO[id] = { cls, tree: ti, k, req: TREE_REQ[k], passive: !!b.passive, fxAt: b.fxAt, desc: b.desc };
-      if (b.passive) { SKILLS[id] = { name: names[k], type: 'passive', passive: true, desc: b.desc, mp: 0 }; return; }
-      const S = { ...b, name: names[k], tier: k + 1, lvl: k };
+      SKILL_INFO[id] = { cls, tree: ti, k, req: REQ_OF[k], pre: PRE_OF[k].map(j => `k_${cls}_${ti}_${j}`), passive: !!b.passive, fxAt: b.fxAt, desc: b.desc };
+      if (b.passive) { SKILLS[id] = { name: allNames[k], type: 'passive', passive: true, desc: b.desc, mp: 0 }; return; }
+      const S = { ...b, name: allNames[k], treeIdx: ti, tier: Math.min(5, [1, 2, 3, 4, 5, 1, 4, 5][k]), lvl: [0, 1, 2, 3, 4, 0, 3, 4][k] };
       if (S.art && !S.anim) S.anim = S.wpn === 'bow' || S.wpn === 'gun' ? 'arrow' : S.wpn === 'spear' ? 'thrust' : S.tgt === 'enemies' ? 'wave' : (S.hits || 1) > 1 ? 'slash2' : 'slash';
       if (!S.anim) S.anim = S.type === 'heal' ? 'heal' : S.type === 'buff' ? 'buff' : S.type === 'debuff' ? 'dark' : 'holy';
       if (S.el === undefined) delete S.el;
       SKILLS[id] = S;
     });
-    return { id: `${cls}_${ti}`, name: '', icon, style, theme: th, skills: ids };
+    return { id: `${cls}_${ti}`, name: '', icon, style, theme: th, skills: SLOT_ORDER.map(k => ids[k]) };
   });
   // a limit break for each class
   const L = { barb: ['諸神黃昏', { type: 'phys', tgt: 'enemies', pow: 3.0, hits: 1, chip: 2, wpn: 'axe', art: 'axe', lvl: 4 }], paladin: ['聖光審判', { type: 'mag', tgt: 'enemies', pow: 2.6, el: 'light', heal: 0.3, chip: 2, school: 'class', tier: 5 }],
@@ -389,11 +456,11 @@ function treeTitle(style, th) {
 for (const [cls, C] of Object.entries(CLASSES)) C.trees.forEach(([style, th, , , title], ti) => { TREES[cls][ti].name = title || treeTitle(style, th); });
 
 // how strong a skill gets per point: SKILLS['id@lv'] is built from SKILLS[id]
-export function scaledSkill(B, lv) {
-  const S = { ...B, name: `${B.name} Lv${lv}`, lvSkill: lv };
-  const k = lv - 1;
-  if (S.pow) S.pow = +(S.pow * (1 + 0.11 * k)).toFixed(3);
-  if (S.base) S.base = Math.round(S.base * (1 + 0.15 * k));
+export function scaledSkill(B, lv, syn = 0) {
+  const S = { ...B, name: `${B.name} Lv${lv}`, lvSkill: lv, syn };
+  const k = lv - 1, sy = 1 + syn / 100;
+  if (S.pow) S.pow = +(S.pow * (1 + 0.11 * k) * sy).toFixed(3);
+  if (S.base) S.base = Math.round(S.base * (1 + 0.15 * k) * sy);
   if (S.mp) S.mp = Math.round(S.mp * (1 + 0.035 * k));
   if (S.chance) S.chance = Math.min(0.95, +(S.chance + 0.02 * k).toFixed(2));
   if (S.revive) S.revive = Math.min(1, +(S.revive + 0.03 * k).toFixed(2));

@@ -327,7 +327,7 @@ const SKILLS_T = {
 let skillScaler = null; const skillDyn = new Map();
 export function setSkillScaler(f) { skillScaler = f; }
 export const SKILLS = new Proxy(SKILLS_T, {
-  get(t, k) { if (k in t) return t[k]; if (typeof k !== 'string' || !k.includes('@') || !skillScaler) return undefined; if (!skillDyn.has(k)) { const [b, lv] = k.split('@'); skillDyn.set(k, t[b] ? skillScaler(t[b], +lv) : undefined); } return skillDyn.get(k); },
+  get(t, k) { if (k in t) return t[k]; if (typeof k !== 'string' || !k.includes('@') || !skillScaler) return undefined; if (!skillDyn.has(k)) { const [b, rest] = k.split('@'); const [lv, syn] = rest.split('~'); skillDyn.set(k, t[b] ? skillScaler(t[b], +lv, +(syn || 0)) : undefined); } return skillDyn.get(k); },
   has(t, k) { return k in t || (typeof k === 'string' && k.includes('@') && k.split('@')[0] in t); },
 });
 

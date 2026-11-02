@@ -12,6 +12,10 @@ import { lookOf } from './field.js?v=1';
 import { SkillFx } from './skillfx.js?v=1';
 import { rollItem } from './loot.js?v=1';
 import { scaleTo, MODS } from './dungeon.js?v=1';
+import { MINIONS, CLASSES } from './classes.js?v=1';
+const MSLOTS = [[0.9, -2.2], [1.1, -0.5], [0.9, 1.3], [-0.5, -1.5], [-0.3, 0.4], [-0.5, 2.2]];
+// big minions stand far from the camera so they never hide the others
+const minionSlot = (used, big) => (big ? [0, 3, 1, 4, 2, 5] : [1, 4, 2, 5, 0, 3]).find(j => !used.has(j)) ?? 0; // where minions stand, in front of the party
 import { STATE_OF, pairsOf, NEW_ECHOES, huntMatch } from './depth.js?v=1';
 
 const ENEMY_DMG = 1.55;
@@ -114,6 +118,9 @@ export class Battle {
       if (meal?.start) this.buff(u, meal.start, true); if (meal?.limit) u.limit = Math.min(100, u.limit + meal.limit); if (meal?.auto) u.autoRegen = true;
       this.units.push(u);
     });
+    // minions that came along from earlier battles
+    this.S.minions = (this.S.minions || []).filter(r => P.includes(r.owner) && r.hp > 0);
+    { const used = new Set(); for (const r of this.S.minions.slice(0, MSLOTS.length)) { const i = minionSlot(used, r.big); used.add(i); this.addMinion(r, i); } }
     const n = troop.length;
     const eslots = n === 1 ? [[-3.8, 0]] : n === 2 ? [[-2.9, -1.4], [-5.0, 1.0]] : n === 3 ? [[-2.4, -1.9], [-5.4, -0.6], [-3.2, 1.6]] : [[-2.2, -2.0], [-5.0, -1.3], [-2.6, 0.9], [-5.4, 1.9]];
     const letters = 'ABCD'; const count = {};
@@ -142,7 +149,7 @@ export class Battle {
     // the dungeon's level, champions and unique monsters (see dungeon.js)
     const M = opts.mod, lv = M?.lv || E.lv;
     // the bestiary was tuned for four heroes: a smaller party meets thinner, weaker monsters
-    const ps = Math.max(1, Math.min(4, this.S.party.length)); if (M) { const kh = Math.pow(ps / 4, 0.6), ka = Math.pow(ps / 4, 0.7); st.hp = Math.round(st.hp * kh); st.atk = Math.round(st.atk * ka); st.mag = Math.round(st.mag * ka); } // all the blows land on fewer heroes
+    const ps = Math.max(1, Math.min(4, this.S.party.length)); if (M) { const kh = Math.pow(ps / 4, 0.6) * (1.15 + ps * 0.1), ka = Math.pow(ps / 4, 0.7) * (1 + ps * 0.04); st.hp = Math.round(st.hp * kh); st.atk = Math.round(st.atk * ka); st.mag = Math.round(st.mag * ka); } // all the blows land on fewer heroes
     if (M && lv < 8) { const kn = 0.68 + lv * 0.04; st.hp = Math.round(st.hp * kn); st.atk = Math.round(st.atk * kn); st.mag = Math.round(st.mag * kn); } // the first levels are gentler
     if (M?.lv) for (const k of ['hp', 'atk', 'def', 'mag', 'spr', 'spd']) st[k] = scaleTo(st[k], k, E.lv, lv);
     if (M?.rank === 1) { st.hp = Math.round(st.hp * 2.2); st.atk = Math.round(st.atk * 1.2); st.mag = Math.round(st.mag * 1.2); }
@@ -152,6 +159,7 @@ export class Battle {
     const nm = M?.rank === 2 ? `${M.name}・${E.name}` : M?.rank === 1 ? `冠軍${E.name}` : E.name;
     const u = { side: 'enemy', fam: E.fam, traits: new Set([...(E.traits || []), ...extraTraits]), barrier: {}, id: eid, E, name: nm + suffix, lv, st, hp: st.hp, mp: 999, shield: E.shield + (M?.rank || 0), maxShield: E.shield + (M?.rank || 0), weak: E.weak, resist: E.resist || [], revealed: new Set(this.S.flags['seen_' + eid] || []), buffs: {}, status: {}, spr, alive: true, broken: false, brokenUntil: -1, boss: !!E.boss || M?.rank === 2 && false, home: pos, rank: M?.rank || 0, mods };
     u.lootLv = lv;
+    if (mods.some(m => m.skill)) u.acts = [...E.acts, ...mods.filter(m => m.skill).map(m => [m.skill, 2.5])];
     for (const m of mods) { if (m.el) u.atkEl = m.el; if (m.onHit) u.onHitSt = m.onHit; if (m.resistAll) u.resistAll = m.resistAll; if (m.aura === 'haste') u.status.haste = 99; if (m.aura === 'regen') u.autoRegen = true; }
     if (M?.rank) { const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 40), new THREE.MeshBasicMaterial({ color: M.rank === 2 ? '#e8b040' : '#5a8aff', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 0); ring.scale.setScalar((spr.w || 1.5) * 0.7); u.rankRing = ring; }
     if (u.traits.has('reflect')) u.status.reflect = 99;
@@ -165,6 +173,54 @@ export class Battle {
     this.units.push(u);
     if (u.traits.has('intimidate') && !this._awed) { this._awed = true; if (this.active) this.awe(u); else this._aweBy = u; } // at the start, once the battle UI is up
     return u;
+  }
+  // ---------------------------------------------------------------- minions (summons that stay from battle to battle)
+  addMinion(rec, i) {
+    const pos = MSLOTS[i]; const ref = Object.values(ENEMIES).find(E => E.kind === rec.kind);
+    const px = monsterPx(rec.kind, ref?.colors || {}); // monster art faces left already: toward the enemies
+    const spr = new VoxelSprite(px, { scale: rec.big ? 1.15 : 0.85, glow: 0.3 });
+    const u = { side: 'party', minion: true, rec, id: 'mn' + i, name: rec.name, hero: null, owner: rec.owner, lv: rec.lv, st: { ...rec.st }, hp: Math.min(rec.hp, rec.st.hp), mp: 0, hands: [], fx: {}, on: [], limit: 0, buffs: {}, status: {}, spr, home: pos, color: '#b8e8a0', immuneSet: new Set(), block: 0, alive: true, act: rec.act, wpn: null };
+    this.addSprite(u, pos[0], pos[1]); spr.popDelay = 0.4 + i * 0.07;
+    this.units.push(u);
+    return u;
+  }
+  async summonMinion(u, S) {
+    const treeIdx = S.treeIdx ?? CLASSES[u.hero].trees.findIndex(t => t[0] === 'summon');
+    const M = MINIONS[`${u.hero}_${treeIdx}`]; if (!M) return;
+    const T = M[S.minion], lv = S.lvSkill || 1, up = 1 + (u.fx?.minionUp || 0), extra = u.fx?.minionCap ? 1 : 0;
+    const cap = (T.big ? 1 : S.minion === 'A' ? Math.min(4, 1 + Math.floor(lv / 5)) : Math.min(3, 1 + Math.floor(lv / 8))) + extra;
+    const k = 1 + 0.05 * (lv - 1), ka = 0.8 * (1 + 0.04 * (lv - 1));
+    const st = { hp: Math.round(u.st.hp * T.hp * k * up), mp: 0, atk: Math.round(Math.max(u.st.mag, u.st.atk) * T.atk * ka * up), mag: Math.round(Math.max(u.st.mag, u.st.atk) * T.atk * ka * up), def: Math.round(u.st.def * 0.7 * up), spr: Math.round(u.st.spr * 0.7 * up), spd: Math.round(u.st.spd * (T.big ? 0.8 : 1.05)) };
+    const same = this.minions.filter(m => m.owner === u.hero && m.rec.slot === S.minion && m.rec.tree === treeIdx);
+    if (same.length >= cap || this.minions.length >= MSLOTS.length) {
+      // at the limit: the old ones are renewed instead (full HP, today's strength)
+      for (const m of same) { m.st = { ...st }; m.rec.st = { ...st }; m.hp = st.hp; this.pop(m, '強化！', '#b8e8a0'); this.effect('heal', m, 'light', u); }
+      if (!same.length) this.pop(u, '召喚物已滿', '#c8c8c8');
+      return;
+    }
+    const rec = { owner: u.hero, tree: treeIdx, slot: S.minion, lv, name: T.n, kind: T.kind, act: T.act, big: !!T.big, st, hp: st.hp };
+    this.S.minions = [...(this.S.minions || []), rec];
+    const i = minionSlot(new Set(this.minions.map(m => MSLOTS.indexOf(m.home))), T.big);
+    const m = this.addMinion(rec, i < 0 ? 0 : i); m.spr.pop = 1;
+    this.fx.emit({ x: m.x, y: 1, z: m.z, n: 40, color: '#b8e8a0', speed: 2.5, up: 1.5, life: 0.8, size: 0.3 });
+    this.pop(m, `${T.n} 出現了！`, '#b8e8a0', true); this.G.audio.sfx('summon');
+    this.ui.timeline(); await wait(350);
+  }
+  async minionTurn(u) {
+    const foes = this.foes; if (!foes.length) return;
+    const S = SKILLS[u.act] || SKILLS.mn_claw;
+    const t = Math.random() < 0.6 ? foes.slice().sort((a, b) => a.hp - b.hp)[0] : foes[Math.random() * foes.length | 0];
+    await this.useSkill(u, u.act, [t]);
+  }
+  async minionCharge(u) { // every minion strikes every enemy once
+    const ms = this.minions; if (!ms.length) { this.pop(u, '沒有召喚物', '#c8c8c8'); return; }
+    for (const m of ms) {
+      if (!this.foes.length) break;
+      const S = SKILLS[m.act] || SKILLS.mn_claw;
+      await this.actorAnim(m, S);
+      await Promise.all(this.foes.map(t => this.strike(m, t, { ...S, tgt: 'enemies', pow: S.pow * 0.85 }, [].concat(S.el || []), { fast: true })));
+      this.checkDeaths(); await this.actorReturn(m);
+    }
   }
   awe(u) { for (const a of this.party) if (a.alive) this.buff(a, { atk: -1 }, true); this.pop(u, '威壓！全隊攻擊↓', '#ff8a8a', true); }
   // a summoner calls a weaker member of its family onto a free spot
@@ -212,7 +268,8 @@ export class Battle {
   }
   clearUnits() { this.vfx?.clear(); for (const u of this.units || []) { this.scene.remove(u.spr.mesh, u.shadow); if (u.rankRing) { this.scene.remove(u.rankRing); u.rankRing.geometry.dispose(); } u.spr.dispose(); } this.units = []; if (this.summonU) { this.scene.remove(this.summonU.spr.mesh); this.summonU = null; } }
 
-  get party() { return this.units.filter(u => u.side === 'party'); }
+  get party() { return this.units.filter(u => u.side === 'party' && !u.minion); }
+  get minions() { return this.units.filter(u => u.minion && u.alive); }
   get foes() { return this.units.filter(u => u.side === 'enemy' && u.alive); }
   get allies() { return this.units.filter(u => u.side === 'party' && u.alive); }
 
@@ -241,6 +298,10 @@ export class Battle {
     if (res === 'win') await this.victory();
     this.ui.hide();
     // write HP/MP and limits back
+    // minions keep their wounds; the fallen are gone, the rest catch their breath after a win
+    for (const m of this.units.filter(x => x.minion)) m.rec.hp = m.alive ? Math.max(1, m.hp) : 0;
+    this.S.minions = res === 'lose' ? [] : (this.S.minions || []).filter(r => r.hp > 0);
+    if (res === 'win') for (const r of this.S.minions) r.hp = Math.min(r.st.hp, r.hp + Math.round(r.st.hp * 0.3));
     for (const u of this.party) { const h = this.S.heroes[u.hero]; h.hp = Math.max(res === 'win' ? (u.alive ? u.hp : 1) : u.hp, res === 'lose' ? 0 : 1); if (!u.alive && res === 'win') h.hp = 1; h.mp = u.mp; h.limit = u.limit; }
     this.clearUnits();
     return res;
@@ -295,7 +356,7 @@ export class Battle {
         if (this.result) break;
         if (u.jumping) continue;
         this.current = u; this.ui.timeline(true);
-        await this.partyTurn(u, true);
+        if (u.minion) await this.minionTurn(u); else await this.partyTurn(u, true);
         this.checkEnd();
       }
       this.inExtra = false;
@@ -363,6 +424,7 @@ export class Battle {
       const pool = this.units.filter(x => x.alive && x !== u && !x.jumping); const t = pool[Math.random() * pool.length | 0]; if (!t) return;
       await this.actorAnim(u, SKILLS.attack); await this.strike(u, t, { type: 'phys', pow: 1, anim: 'slash', tgt: 'enemy' }, [], { noCover: true, atk: u.st.atk }); this.checkDeaths(); await this.actorReturn(u); return;
     }
+    if (u.minion) return this.minionTurn(u);
     if (u.side === 'party') return this.partyTurn(u, false);
     return this.enemyTurn(u);
   }
@@ -384,6 +446,10 @@ export class Battle {
     const can = (s) => { const D = SKILLS[s]; return D && u.mp >= this.mpCost(u, D) && !(u.status.silence && (D.spell || ['mag', 'heal', 'debuff'].includes(D.type)) && !D.art); };
     const dead = this.party.find(p => !p.alive);
     if (dead) { const rv = all.find(s => SKILLS[s].tgt === 'dead' && can(s)); if (rv) return { kind: 'skill', skill: rv, targets: [dead] }; }
+    // summoners call their minions first, and send them all in when there are several enemies
+    { const mine = this.minions.filter(m => m.owner === u.hero); const sum = all.filter(s => SKILLS[s].minion && can(s)).sort((a, b) => (SKILLS[b].minion === 'C') - (SKILLS[a].minion === 'C'));
+      for (const s of sum) { const D = SKILLS[s], have = mine.filter(m => m.rec.slot === D.minion).length, cap = D.minion === 'C' ? 1 : D.minion === 'A' ? Math.min(4, 1 + Math.floor((D.lvSkill || 1) / 5)) : Math.min(3, 1 + Math.floor((D.lvSkill || 1) / 8)); if (have < cap && this.minions.length < MSLOTS.length) return { kind: 'skill', skill: s, targets: [u] }; }
+      const cmd = all.find(s => SKILLS[s].minionAll && can(s)); if (cmd && mine.length >= 2 && foes.length >= 2 && Math.random() < 0.5) return { kind: 'skill', skill: cmd, targets: [u] }; }
     if (low) { const hs = all.filter(s => SKILLS[s].type === 'heal' && SKILLS[s].tgt !== 'dead' && (SKILLS[s].pow > 0 || SKILLS[s].full) && can(s)).sort((a, b) => (SKILLS[b].pow || 9) - (SKILLS[a].pow || 9))[0]; if (hs) return { kind: 'skill', skill: hs, targets: SKILLS[hs].tgt === 'allies' ? this.allies : [low] }; }
     if (u.limit >= 100) return { kind: 'limit' };
     // pick the best known weakness hit
@@ -491,6 +557,7 @@ export class Battle {
 
   // ---------------------------------------------------------------- the heart: using a skill
   async useSkill(u, sid, targets, o = {}) {
+    if (u.side === 'enemy' && sid.startsWith('x_') && SKILLS[sid]) await this.ui.banner(SKILLS[sid].name, u.name, '#ff6a4a'); // a strong monster's special move
     const S = SKILLS[sid];
     if (sid === 'attack' && u.side === 'party') return this.weaponAttack(u, targets[0], o);
     const spellish = !S.art && (S.spell || ['mag', 'heal', 'debuff'].includes(S.type));
@@ -513,6 +580,8 @@ export class Battle {
     if (o.landing) { let t = 0; const tx = targets[0].x + 0.8; u.ox = tx - u.x; while (t < 0.3) { t += await this.G.frame(); u.oy = 40 * (1 - t / 0.3); } u.oy = 0; if (S.tgt === 'enemies') targets = this.foes; }
     await this.actorAnim(u, S);
     if (u.side === 'party' && (S.art || S.school)) await this.vfx.cast(u, S, targets); // every art and spell has its own wind-up
+    if (S.minion) await this.summonMinion(u, S);
+    if (S.minionAll) await this.minionCharge(u);
     // things that happen once, to the user
     if (S.stance) { u.stance = S.stance; this.pop(u, { parry: '招架架式', counter: '明鏡止水', cover: '掩護', wall: '鐵壁' }[S.stance], '#8ac8ff'); }
     if (S.amp) { u.amp = S.amp; this.pop(u, '魔力增幅', '#c8a0ff'); }
@@ -970,6 +1039,7 @@ export class Battle {
       if (u.side === 'enemy' && u.traits?.has('undying') && !u.revived && !u.noUndying && !u.broken && !(u.lastTags || []).some(x => x === 'light' || x === 'fire')) { u.revived = true; u.hp = Math.round(u.st.hp * 0.4); this.pop(u, '不死復活！', '#c84aff', true); this.effect('raise', u, 'dark', u); continue; }
       u.alive = false; u.dying = false;
       if (u.side === 'enemy') { this.fadeOut(u); this.G.audio.sfx('kill'); this.onEnemyDeath(u); }
+      else if (u.minion) { this.fadeOut(u); this.pop(u, `${u.name} 倒下了`, '#c8c8c8'); u.rec.hp = 0; }
       else { u.spr.setFrame(BPOSE.ko); u.buffs = {}; u.status = {}; u.jumping = null; u.oy = 0; }
       this.queue = (this.queue || []).filter(q => q !== u);
     }
@@ -1029,7 +1099,7 @@ export class Battle {
       }
       if (tr.has('hunter') && (!u.prey || !u.prey.alive)) { const pool = this.allies.filter(a => !a.jumping); if (pool.length) { for (const a of this.party) a.hunted = false; u.prey = pool[Math.random() * pool.length | 0]; u.prey.hunted = true; this.pop(u.prey, '被鎖定了！', '#ff4a3a', true); await wait(300); } }
     }
-    const acts = u.E.acts; let total = acts.reduce((s, a) => s + a[1], 0), r = Math.random() * total, pick = acts[0][0];
+    const acts = u.acts || u.E.acts; let total = acts.reduce((s, a) => s + a[1], 0), r = Math.random() * total, pick = acts[0][0];
     for (const [s, w] of acts) { r -= w; if (r <= 0) { pick = s; break; } }
     let S = SKILLS[pick];
     if (S.type === 'heal' && !this.foes.some(f => f.hp < f.st.hp * 0.6)) { pick = acts.find(a => SKILLS[a[0]].type === 'phys')?.[0] || 'e_tackle'; S = SKILLS[pick]; }
@@ -1323,7 +1393,7 @@ class BattleUI {
   }
   addEnemy(u) {
     const d = document.createElement('div'); d.className = 'b-einfo' + (u.boss ? ' boss' : '');
-    d.innerHTML = `<div class="b-ename">${u.name}<span class="b-etr">${[...u.traits].filter(t => TRAIT_N[t]).map(t => `<i title="${TRAIT_N[t][1]}：${TRAIT_N[t][2]}">${TRAIT_N[t][0]}</i>`).join('')}</span><span class="b-est"></span></div><div class="b-ebar"><i></i></div><div class="b-erow"><span class="b-shield"><b></b></span><span class="b-weak"></span></div>`;
+    d.innerHTML = `<div class="b-ename">${u.name}<span class="b-etr">${[...u.traits].filter(t => TRAIT_N[t]).map(t => `<i title="${TRAIT_N[t][1]}：${TRAIT_N[t][2]}">${TRAIT_N[t][0]}</i>`).join('')}</span><span class="b-est"></span></div>${u.mods?.length ? `<div style="font-size:10px;line-height:1.2;color:${u.rank === 2 ? '#e8b040' : '#8ab0ff'}">${u.mods.map(m => m.skill ? `<b style="color:#ff8a6a">${m.n}</b>` : m.n).join('・')}</div>` : ''}<div class="b-ebar"><i></i></div><div class="b-erow"><span class="b-shield"><b></b></span><span class="b-weak"></span></div>`;
     this.en.appendChild(d); u.info = d;
     d.onclick = () => this.pickHook && this.pickHook(u);
   }
@@ -1345,6 +1415,9 @@ class BattleUI {
   }
   refresh() {
     const b = this.b; if (!this.pt) return;
+    // the minions: a small strip under the auto/speed buttons
+    { let mn = this.root.querySelector('#bmn'); const ms = b.units.filter(u => u.minion); if (!mn) { mn = document.createElement('div'); mn.id = 'bmn'; mn.style.cssText = 'position:absolute;top:96px;right:12px;display:flex;flex-direction:column;gap:3px;font-size:12px;z-index:3;pointer-events:none'; this.root.appendChild(mn); }
+      mn.innerHTML = ms.map(m => `<div style="background:rgba(10,20,30,.72);border:1px solid #6a9a5a;border-radius:6px;padding:2px 8px;min-width:130px;opacity:${m.alive ? 1 : 0.4}"><span style="color:#b8e8a0">${m.name}</span> <span style="float:right">${Math.max(0, m.hp)}/${m.st.hp}</span><div style="height:3px;background:#333;margin-top:2px"><i style="display:block;height:3px;width:${Math.max(0, m.hp) / m.st.hp * 100}%;background:#7ae86a"></i></div></div>`).join(''); }
     this.pt.innerHTML = b.party.map(u => {
       const st = Object.keys(u.status).map(k => STATUS_S[k] || '').join('') + Object.keys(u.barrier || {}).map(e => ICON[e]).join('') + (u.stance ? '構' : '') + (u.enchant ? ICON[u.enchant.el] : '');
       const bf = Object.entries(u.buffs).map(([k, v]) => `<i class="${v.v > 0 ? 'up' : 'dn'}">${({ atk: '攻', def: '防', mag: '魔', spr: '精', spd: '速' })[k]}</i>`).join('');

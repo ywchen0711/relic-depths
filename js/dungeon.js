@@ -2,7 +2,7 @@
 // a winding way from the entrance to the exit, rooms along it, side passages with chests, and a waypoint crystal on
 // the first and third level. The fourth level of each act ends in the act boss's lair.
 import { MAPS, G } from './maps.js?v=1';
-import { ENEMIES } from './data.js?v=1';
+import { ENEMIES, SKILLS } from './data.js?v=1';
 import { BESTIARY_NEW } from './content.js?v=1';
 
 export const DIFFS = [{ n: '普通', add: 0, c: '#e8e8e8' }, { n: '噩夢', add: 36, c: '#ff8a4a' }, { n: '地獄', add: 62, c: '#ff3a3a' }];
@@ -112,22 +112,44 @@ export const MODS = {
   resist: { n: '魔法抗性', resistAll: 0.5, c: '#c8a0ff' }, mana: { n: '法力燃燒', traits: ['mpburn'], c: '#4a8aff' }, vamp: { n: '吸血', traits: ['leech'], c: '#e84a6a' },
   curse: { n: '詛咒', traits: ['intimidate'], c: '#b06aff' }, phase: { n: '幻影', traits: ['phase'], c: '#e8e8ff' }, split: { n: '分裂', traits: ['split'], c: '#8ae84a' },
   guard: { n: '守衛', traits: ['guardian'], c: '#8ac8ff' }, haste: { n: '狂熱光環', aura: 'haste', c: '#ffb04a' }, regen: { n: '再生', aura: 'regen', c: '#6ae8a0' },
+  // special moves: champions sometimes, unique monsters usually, carry one of these
+  p_meteor: { n: '隕石術', skill: 'x_meteor' }, p_blizzard: { n: '暴風雪', skill: 'x_blizzard' }, p_chain: { n: '連鎖閃電', skill: 'x_chain' }, p_quake: { n: '大地震', skill: 'x_quake' },
+  p_frenzy: { n: '狂亂連擊', skill: 'x_frenzy' }, p_drain: { n: '生命吸取', skill: 'x_drain' }, p_heal: { n: '再生術', skill: 'x_heal' }, p_curse: { n: '衰弱詛咒', skill: 'x_curse' },
+  p_doom: { n: '死亡宣告', skill: 'x_doom' }, p_rage: { n: '狂暴化', skill: 'x_rage' }, p_poison: { n: '毒霧', skill: 'x_poison' }, p_holy: { n: '審判之光', skill: 'x_holy' },
+  p_sleep: { n: '催眠波', skill: 'x_sleep' }, p_shatter: { n: '碎甲重擊', skill: 'x_shatter' },
 };
+Object.assign(SKILLS, {
+  x_meteor: { name: '隕石術', type: 'mag', tgt: 'enemies', pow: 1.6, el: 'fire', anim: 'meteor', desc: '火屬性全體大傷害' },
+  x_blizzard: { name: '暴風雪', type: 'mag', tgt: 'enemies', pow: 1.35, el: 'ice', status: 'slow', chance: 0.4, anim: 'ice' },
+  x_chain: { name: '連鎖閃電', type: 'mag', tgt: 'enemy', pow: 1.5, el: 'thunder', chain: 3, anim: 'thunder' },
+  x_quake: { name: '大地震', type: 'phys', tgt: 'enemies', pow: 1.3, el: 'earth', status: 'stun', chance: 0.25, anim: 'quake' },
+  x_frenzy: { name: '狂亂連擊', type: 'phys', tgt: 'random', pow: 0.7, hits: 4, anim: 'claw' },
+  x_drain: { name: '生命吸取', type: 'mag', tgt: 'enemy', pow: 1.7, el: 'dark', drain: true, anim: 'dark' },
+  x_heal: { name: '再生術', type: 'heal', tgt: 'self', healP: 0.35, anim: 'heal' },
+  x_curse: { name: '衰弱詛咒', type: 'debuff', tgt: 'enemies', debuff: { atk: 1, def: 1 }, anim: 'dark' },
+  x_doom: { name: '死亡宣告', type: 'debuff', tgt: 'enemy', status: 'doom', chance: 0.6, anim: 'dark' },
+  x_rage: { name: '狂暴化', type: 'buff', tgt: 'self', buff: { atk: 2, spd: 1 }, anim: 'buff' },
+  x_poison: { name: '毒霧', type: 'debuff', tgt: 'enemies', status: 'poison', chance: 0.75, anim: 'dark' },
+  x_holy: { name: '審判之光', type: 'mag', tgt: 'enemies', pow: 1.45, el: 'light', anim: 'holy' },
+  x_sleep: { name: '催眠波', type: 'debuff', tgt: 'enemies', status: 'sleep', chance: 0.45, anim: 'song' },
+  x_shatter: { name: '碎甲重擊', type: 'phys', tgt: 'enemy', pow: 2.0, debuff: { def: 2 }, anim: 'slash' },
+});
 const UNIQ_A = ['腐骨', '血爪', '碎顱', '影牙', '毒心', '狂怒', '骸王', '冥火', '霜嚎', '雷鳴', '黑翼', '鐵皮', '噬魂', '裂地', '夜行'];
 const UNIQ_B = ['者', '之主', '屠夫', '暴君', '惡徒', '收割者', '吞噬者', '掠奪者'];
 export function rollTroop(S, def, r = Math.random) {
   const lv = def.alv, pool = poolFor(def.hab, Math.min(lv, 60));
-  const ps = S.party.length, n = 1 + Math.floor(r() * (ps >= 3 ? 3 : 2)) + (r() < (ps >= 2 ? 0.25 : 0.08) ? 1 : 0);
+  const ps = S.party.length, n = (ps >= 3 ? 2 : 1) + Math.floor(r() * (ps >= 2 ? 3 : 2)) + (r() < (ps >= 2 ? 0.25 : 0.08) ? 1 : 0); // bigger parties meet bigger packs
   const troop = [], mods = [];
   const kind = r() < 0.05 ? 'unique' : r() < 0.12 ? 'champion' : 'normal';
   const mainId = pool[Math.floor(r() * pool.length)];
-  const modKeys = Object.keys(MODS);
-  const pickMods = (k) => { const out = []; while (out.length < k) { const m = modKeys[Math.floor(r() * modKeys.length)]; if (!out.includes(m)) out.push(m); } return out; };
+  const modKeys = Object.keys(MODS).filter(k => !MODS[k].skill), powKeys = Object.keys(MODS).filter(k => MODS[k].skill);
+  const pickFrom = (keys, k, out = []) => { while (out.length < k) { const m = keys[Math.floor(r() * keys.length)]; if (!out.includes(m)) out.push(m); } return out; };
+  const pickMods = (k, pw) => [...pickFrom(modKeys, k), ...pickFrom(powKeys, pw)];
   for (let i = 0; i < Math.min(4, n); i++) {
     const id = kind === 'normal' ? pool[Math.floor(r() * pool.length)] : mainId;
     troop.push(id);
-    if (kind === 'champion') mods.push({ rank: 1, mods: i === 0 ? pickMods(1) : [], lv });
-    else if (kind === 'unique' && i === 0) mods.push({ rank: 2, mods: pickMods(2 + (S.diff > 0 ? 1 : 0)), lv, name: UNIQ_A[Math.floor(r() * UNIQ_A.length)] + UNIQ_B[Math.floor(r() * UNIQ_B.length)] });
+    if (kind === 'champion') mods.push({ rank: 1, mods: i === 0 ? pickMods(1, r() < 0.35 ? 1 : 0) : [], lv });
+    else if (kind === 'unique' && i === 0) mods.push({ rank: 2, mods: pickMods(2 + (S.diff > 0 ? 1 : 0), (r() < 0.75 ? 1 : 0) + (S.diff > 0 && r() < 0.5 ? 1 : 0)), lv, name: UNIQ_A[Math.floor(r() * UNIQ_A.length)] + UNIQ_B[Math.floor(r() * UNIQ_B.length)] });
     else mods.push({ rank: 0, mods: [], lv: lv + Math.round((r() - 0.5) * 2) });
   }
   if (kind === 'champion') { const m = mods[0].mods; for (const x of mods) x.mods = m; } // a champion pack shares its modifier

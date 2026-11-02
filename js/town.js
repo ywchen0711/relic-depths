@@ -12,7 +12,7 @@ export function makeStory(G) {
   const nextBoss = () => { const s = S(); for (let a = 0; a < ACTS.length; a++) if (!s.cleared[`${s.diff}_${a}`]) return a; return -1; };
   const TALK = {
     async merchant() { await say('商人 歐德', '要買點什麼？裝備每次你變強就會換一批新貨。', 'merchant'); await G.ui.merchantMenu(); },
-    async healer() { healAll(S()); G.audio.sfx('heal'); G.ui.hud(); await say('治療師 艾菈', '傷都治好了。\n去吧，願光照亮你的路。', 'priest'); },
+    async healer() { healAll(S()); for (const r of S().minions || []) r.hp = r.st.hp; G.audio.sfx('heal'); G.ui.hud(); await say('治療師 艾菈', '傷都治好了。\n去吧，願光照亮你的路。', 'priest'); },
     async recruiter() { await say('傭兵隊長 葛倫', '十種職業的冒險者都在這個營地裡。\n付錢，他們就跟你走。', 'guard'); await G.ui.hireMenu(); },
     async gambler() { await say('賭徒 薇拉', '想試試手氣嗎？\n袋子裡是什麼，連我都不知道。', 'lady'); await G.ui.gambleMenu(); },
     async elder() {
