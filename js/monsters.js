@@ -364,7 +364,7 @@ for (const [id, name, kind, lv, colors, el, ex = {}] of R_) {
   const k = K[kind], [mh, ma, md, mm, ms] = k.m;
   const hp = Math.round((22 + 12 * lv + 0.45 * lv * lv) * mh * (ex.hpMul || 1) * (ex.metal ? 0 : 1)) || 0;
   const E = {
-    name, kind, colors, lv, hp: ex.metal ? 6 + Math.floor(lv / 6) : hp,
+    name, kind, colors: el ? { elem: el, ...colors } : colors, lv, hp: ex.metal ? 6 + Math.floor(lv / 6) : hp,
     atk: Math.round((12 + 2.0 * lv) * ma), def: ex.metal ? 999 : Math.round((5 + 1.0 * lv) * md), mag: Math.round((10 + 1.8 * lv) * mm), spr: ex.metal ? 999 : Math.round((5 + 0.9 * lv) * (k.resistPhys ? 1.3 : 1)), spd: Math.round((8 + 0.45 * lv) * ms * (ex.metal ? 2 : 1)),
     shield: ex.metal ? 1 : 2 + Math.floor(lv / 12) + (k.size || 1) - 1,
     weak: [], resist: [], exp: Math.max(4, Math.round(2.2 * Math.pow(lv, 1.25) * (k.size || 1) * (ex.metal ? 30 : 1))), gil: Math.round((2 * Math.pow(lv, 1.2) + 5) * (ex.gilMul || 1)),

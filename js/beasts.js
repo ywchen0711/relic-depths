@@ -68,13 +68,102 @@ M.wisp = (c) => {
   return p; // a glow has no outline
 };
 M.elemental = (c) => {
-  const p = P(48, 58), R = ramp(c.body), L = ramp(shade(c.body, 0.4));
-  for (let i = 0; i < 54; i++) { const t = i / 53, w = 5 + Math.sin(t * Math.PI) * 15; for (let x = -w; x < w; x++) p.set(24 + x + Math.sin(t * 9 + x * 0.2) * 2.5, 56 - i, lit(R, -x / w * 0.6 - (0.5 - t) * 1.2 + (i % 6 < 2 ? -0.5 : 0))); }
-  limb(p, 12, 26, 3, 36, 5, 2, R); limb(p, 36, 26, 45, 36, 5, 2, R); // arms of swirling stuff
-  p.sell(24, 21, 10, 11, L);
-  p.ell(19, 20, 2.6, 3.4, OL); p.ell(29, 20, 2.6, 3.4, OL); p.set(18, 18, '#fff'); p.set(28, 18, '#fff'); p.ell(24, 27, 3, 1.6, OL);
-  if (c.rock) for (let i = 0; i < 9; i++) poly(p, (() => { const x = 8 + rnd() * 30, y = 10 + rnd() * 38; return [[x, y], [x + 5, y - 1], [x + 6, y + 4], [x + 1, y + 5]]; })(), ramp(c.rock));
-  return p;
+  // a spirit with a body of its own element: the upper half is a figure, the lower half is the element itself
+  const p = P(56, 64), body = c.body || '#ff6a2a', R = ramp(body), L = ramp(shade(body, 0.45)), D = ramp(shade(body, -0.3));
+  const hue = (() => { const n = parseInt(body.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx - mn < 30) return mx > 200 ? 'light' : 'earth'; const h = mx === r ? ((g - b) / (mx - mn) + 6) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4; return h < 0.7 ? 'fire' : h < 1.3 ? 'thunder' : h < 2.6 ? 'wind' : h < 3.4 ? 'ice' : h < 4.3 ? 'water' : 'dark'; })();
+  const el = c.rock ? 'earth' : c.elem || hue, core = shade(body, 0.75);
+  const eyes = (col = '#ffffff') => { poly(p, [[20, 17], [25, 18], [24, 20], [20, 19]], col); poly(p, [[32, 17], [27, 18], [28, 20], [32, 19]], col); };
+  // the figure: head, shoulders, arms reaching out
+  const figure = (T = R, arms = true) => {
+    poly(p, [[17, 25], [35, 25], [37, 30], [33, 42], [19, 42], [15, 30]], T);
+    if (arms) { chain(p, [[17, 27], [9, 33], [5, 28]], 3.4, 2.2, T); chain(p, [[35, 27], [43, 33], [47, 28]], 3.4, 2.2, T); }
+    p.sell(26, 16, 8, 9, T);
+  };
+  if (el === 'fire') {
+    // the lower half is a single flame narrowing to a point; tongues of fire lick up from the hips and the head
+    const Y = ramp('#ffe86a'), flame = (pts, r, T) => chain(p, pts, r, 0.5, T);
+    for (const s of [-1, 1]) { flame([[26 + s * 6, 46], [26 + s * 14, 40], [26 + s * 18, 30], [26 + s * 16, 22]], 4.5, R); flame([[26 + s * 6, 52], [26 + s * 16, 50], [26 + s * 22, 42]], 3.4, R); }
+    flame([[26, 38], [24, 48], [28, 56], [24, 63]], 10, R); flame([[26, 40], [25, 48], [27, 55]], 6, L); flame([[26, 42], [26, 49]], 3, Y);
+    for (let i = 0; i < 7; i++) { const a = -2.5 + i * 0.32, r = i % 2 ? 13 : 17; chain(p, [[26 + Math.cos(a) * 5, 12 + Math.sin(a) * 5], [26 + Math.cos(a) * r * 0.6 + Math.sin(i) * 2, 12 + Math.sin(a) * r * 0.6], [26 + Math.cos(a - 0.15) * r, 12 + Math.sin(a - 0.15) * r]], 3.4, 0.4, i % 2 ? L : R); } // burning hair
+    figure(R); p.sell(26, 33, 6, 6.5, L); p.sell(26, 33, 3, 3.4, Y); // glowing chest
+    for (const [x, y] of [[5, 28], [47, 28]]) for (let i = 0; i < 3; i++) chain(p, [[x, y], [x + (i - 1) * 2, y - 6], [x + (i - 1) * 4, y - 11]], 2.2, 0.4, i === 1 ? L : R); // hands on fire
+    for (const [x, y] of [[6, 52], [46, 56], [10, 8], [44, 10], [40, 46]]) { p.set(x, y, Y[0]); p.set(x, y + 1, R[1]); } // embers
+    eyes('#fffbe0'); p.rect(21, 18, 3, 1, D[2]); p.rect(28, 18, 3, 1, D[2]);
+    return p.outline(shade(body, -0.55));
+  }
+  if (el === 'water') {
+    chain(p, [[26, 42], [24, 50], [14, 56], [6, 52], [8, 44], [14, 46]], 7, 2, R); chain(p, [[26, 42], [32, 52], [44, 58], [52, 52], [48, 44], [42, 46]], 7, 2, R); // a wave curling both ways
+    p.sell(28, 58, 18, 5, R); for (let i = 0; i < 6; i++) poly(p, [[10 + i * 7, 56], [14 + i * 7, 52], [17 + i * 7, 56]], L);
+    chain(p, [[32, 10], [40, 14], [44, 24], [48, 36]], 4, 1.4, D); chain(p, [[20, 10], [12, 16], [10, 26]], 3.4, 1.2, D); // flowing hair
+    figure(R);
+    for (const [x, y] of [[20, 30], [24, 34], [30, 28], [28, 38]]) p.set(x, y, L[0]);
+    chain(p, [[19, 9], [22, 7], [27, 7]], 1, 0.6, '#ffffff'); chain(p, [[18, 30], [18, 38]], 0.8, 0.6, L[0]);
+    for (const [x, y, r] of [[4, 18, 2.2], [50, 16, 1.8], [8, 8, 1.4], [46, 6, 1.2]]) { p.sell(x, y, r, r * 1.3, L); p.set(x - 0.5, y - 1, '#ffffff'); } // droplets
+    eyes(); p.rect(22, 18, 2, 2, c.eye || '#1a4a8a'); p.rect(28, 18, 2, 2, c.eye || '#1a4a8a');
+    return p.outline(shade(body, -0.55));
+  }
+  if (el === 'wind') {
+    for (let i = 0; i < 6; i++) { const y = 42 + i * 3.6, w = 14 - i * 2.2; p.sell(26 + Math.sin(i * 1.3) * 3, y, w, 2.6, i % 2 ? R : L); } // the whirlwind below
+    for (let i = 0; i < 5; i++) chain(p, [[10 + i * 2, 42 + i * 4], [26, 46 + i * 4], [40 - i * 2, 42 + i * 4]], 0.6, 0.6, D[1]);
+    chain(p, [[30, 9], [42, 8], [52, 4]], 3, 0.8, L); chain(p, [[32, 14], [44, 16], [54, 12]], 2.6, 0.6, L); chain(p, [[30, 18], [40, 22], [50, 22]], 2, 0.5, L); // hair streaming in the wind
+    figure(R);
+    for (const [x, y] of [[4, 40], [48, 44], [8, 52], [44, 34]]) { poly(p, [[x, y], [x + 3, y - 2], [x + 5, y], [x + 2, y + 2]], ramp('#6ac84a')); } // leaves caught up in it
+    chain(p, [[2, 22], [10, 18], [16, 22]], 0.7, 0.5, L[0]); chain(p, [[38, 50], [46, 48], [52, 52]], 0.7, 0.5, L[0]);
+    eyes(); p.rect(21, 18, 2, 1, '#1a6a4a'); p.rect(29, 18, 2, 1, '#1a6a4a');
+    return p.outline(shade(body, -0.6));
+  }
+  if (el === 'earth') {
+    const Rk = ramp(c.rock || shade(body, -0.25)), glow = c.eye || '#ffb03a';
+    const rock = (x, y, w, h, T = Rk) => poly(p, [[x - w, y - h * 0.3], [x - w * 0.5, y - h], [x + w * 0.6, y - h * 0.9], [x + w, y - h * 0.1], [x + w * 0.7, y + h], [x - w * 0.6, y + h * 0.9]], T);
+    for (const [x, y, w, h] of [[12, 58, 9, 5], [26, 59, 11, 5], [41, 58, 9, 5]]) rock(x, y, w, h); // rubble it stands in
+    rock(26, 46, 12, 9, R); rock(26, 32, 14, 9, R); // hips and chest
+    chain(p, [[14, 28], [8, 36], [6, 44]], 4, 4, Rk); chain(p, [[38, 28], [44, 36], [46, 44]], 4, 4, Rk); rock(6, 47, 6, 5, R); rock(46, 47, 6, 5, R); // arms and boulder fists
+    rock(12, 25, 6, 5, Rk); rock(40, 25, 6, 5, Rk); // shoulders
+    rock(26, 15, 8, 8, R); // head
+    for (const pts of [[[22, 28], [26, 33], [24, 38], [28, 42]], [[30, 30], [34, 36]], [[20, 44], [24, 48]], [[4, 46], [8, 49]]]) chain(p, pts, 0.7, 0.7, glow); // glowing cracks
+    p.rect(21, 15, 3, 2, glow); p.rect(28, 15, 3, 2, glow); p.set(21, 15, '#fff8c0'); p.set(28, 15, '#fff8c0');
+    spots(p, 16, 4, 6, 46, 54, Rk[2], true);
+    return p.outline();
+  }
+  if (el === 'ice') {
+    const shard = (x, y, w, h, lean = 0) => { poly(p, [[x - w, y], [x + lean - w * 0.2, y - h], [x + lean, y - h - 3], [x, y + 2]], L); poly(p, [[x, y + 2], [x + lean, y - h - 3], [x + lean + w * 0.3, y - h], [x + w, y]], D); };
+    for (const [x, y, w, h, l] of [[10, 62, 5, 10, -3], [42, 62, 5, 12, 3], [18, 62, 6, 16, -1], [34, 62, 6, 15, 2], [26, 62, 7, 20, 0]]) shard(x, y, w, h, l); // crystals growing up from the ground
+    figure(R);
+    for (const [x, y, h] of [[18, 10, 6], [22, 7, 9], [26, 5, 12], [30, 7, 9], [34, 10, 6]]) shard(x, y, 2, h); // a crown of ice
+    poly(p, [[26, 28], [30, 33], [26, 40], [22, 33]], L); p.set(25, 31, '#ffffff'); // a crystal heart
+    for (const [x, y] of [[4, 20], [48, 22], [6, 10], [46, 8]]) { poly(p, [[x, y - 3], [x + 1.5, y], [x, y + 3], [x - 1.5, y]], L); }
+    eyes('#e8fcff'); p.rect(21, 18, 2, 1, c.eye || '#2a6aa8'); p.rect(29, 18, 2, 1, c.eye || '#2a6aa8');
+    return p.outline(shade(body, -0.6));
+  }
+  if (el === 'thunder') {
+    const C = ramp('#6a6a8a');
+    for (const [x, y, r] of [[12, 54, 8], [24, 56, 10], [38, 54, 9], [30, 50, 8], [18, 49, 7]]) p.sell(x, y, r, r * 0.7, C); // a storm cloud below
+    for (let i = 0; i < 9; i++) { const a = -2.9 + i * 0.36, r = i % 2 ? 12 : 16; poly(p, [[26 + Math.cos(a - 0.2) * 6, 14 + Math.sin(a - 0.2) * 6], [26 + Math.cos(a) * r, 14 + Math.sin(a) * r], [26 + Math.cos(a + 0.2) * 6, 14 + Math.sin(a + 0.2) * 6]], R); } // hair standing up
+    figure(R); poly(p, [[19, 40], [33, 40], [28, 48], [24, 48]], R);
+    const bolt = (pts) => { chain(p, pts, 1.3, 1.3, '#ffffff'); chain(p, pts.map(([x, y]) => [x + 1, y]), 0.6, 0.6, core); };
+    bolt([[5, 28], [2, 36], [6, 38], [1, 48]]); bolt([[47, 28], [51, 34], [47, 37], [53, 46]]); bolt([[22, 58], [19, 62]]); bolt([[34, 58], [36, 63]]);
+    poly(p, [[27, 28], [23, 34], [27, 34], [24, 41], [31, 32], [27, 32], [29, 28]], '#ffffff'); // a bolt on the chest
+    eyes(); p.rect(21, 18, 3, 1, c.eye || '#4a4ae0'); p.rect(28, 18, 3, 1, c.eye || '#4a4ae0');
+    return p.outline(shade(body, -0.6));
+  }
+  if (el === 'light') {
+    const H = ramp('#ffe88a');
+    for (let i = 0; i < 7; i++) { const a = -0.5 - i * 0.36; limb(p, 30, 28, 30 + Math.cos(a) * 26 + 6, 28 + Math.sin(a) * 24, 2.6, 0.8, L); limb(p, 22, 28, 22 - Math.cos(a) * 26 - 6, 28 + Math.sin(a) * 24, 2.6, 0.8, L); } // wings of light
+    for (let a = 0; a < Math.PI * 2; a += 0.05) p.set(26 + Math.cos(a) * 11, 13 + Math.sin(a) * 3.5 - 8, H[a > Math.PI ? 0 : 1]); // halo
+    poly(p, [[19, 38], [33, 38], [42, 62], [10, 62]], R); for (let i = 0; i < 4; i++) limb(p, 18 + i * 5, 44, 14 + i * 8, 61, 0.6, 0.6, D[1]); // a flowing robe
+    figure(R); p.sell(26, 32, 4, 4, ramp('#ffffff'));
+    eyes(c.eye || '#ffcf4a');
+    return p.outline(shade(body, -0.5));
+  }
+  // darkness: a hooded shape of smoke with burning eyes and grasping tendrils
+  for (let i = 0; i < 6; i++) chain(p, [[16 + i * 4, 44], [12 + i * 5 + Math.sin(i) * 3, 54], [8 + i * 7, 62]], 3.6, 0.8, D);
+  poly(p, [[14, 18], [20, 6], [26, 3], [33, 6], [38, 18], [40, 34], [36, 48], [16, 48], [12, 34]], R); // hooded cloak
+  chain(p, [[16, 28], [6, 34], [2, 30], [4, 24]], 3, 1, D); chain(p, [[36, 28], [46, 36], [50, 30], [48, 26]], 3, 1, D); // tendril arms
+  for (const [x, y] of [[2, 24], [4, 30], [48, 26], [50, 32]]) limb(p, x, y, x + (x < 26 ? -2 : 2), y - 3, 0.8, 0.4, D[2]);
+  p.sell(26, 18, 8, 9, ramp(shade(body, -0.65))); // the empty hood
+  const ey = c.eye || '#ff3a6a'; poly(p, [[20, 17], [25, 18], [24, 20], [20, 19]], ey); poly(p, [[32, 17], [27, 18], [28, 20], [32, 19]], ey); p.set(21, 18, '#ffffff'); p.set(31, 18, '#ffffff');
+  chain(p, [[26, 30], [26, 44]], 0.6, 0.6, D[2]); chain(p, [[20, 34], [18, 46]], 0.6, 0.6, D[2]); chain(p, [[32, 34], [34, 46]], 0.6, 0.6, D[2]);
+  return p.outline();
 };
 M.ghost = (c) => {
   const p = P(46, 54), R = ramp(c.body || '#e8eef8');
@@ -141,17 +230,29 @@ M.bat = (c) => {
   return p.outline();
 };
 M.bird = (c) => {
-  const p = P(62, 54), R = ramp(c.body), W = ramp(c.wing || shade(c.body, -0.15)), BK = ramp('#e8b040'), Bl = ramp(c.belly || shade(c.body, 0.35));
-  // raised wing with layered feathers behind the body
-  poly(p, [[30, 22], [36, 6], [46, 0], [58, 2], [54, 8], [60, 10], [54, 16], [58, 20], [48, 24], [40, 30]], W);
-  for (let i = 0; i < 5; i++) limb(p, 34 + i * 2, 18 + i, 52 + i * 1.5, 2 + i * 4.6, 0.8, 0.5, W[2]);
-  for (let i = 0; i < 5; i++) { const a = 0.15 + i * 0.22; poly(p, [[42, 33], [42 + Math.cos(a) * 18 - 2, 33 + Math.sin(a) * 16 - 2], [42 + Math.cos(a) * 19 + 1, 33 + Math.sin(a) * 17 + 1]], i % 2 ? W : ramp(shade(c.wing || shade(c.body, -0.15), 0.15))); } // fanned tail feathers
-  p.sell(32, 30, 14, 11, R); p.sell(28, 33, 9, 7, Bl);
-  p.sell(17, 19, 8, 8, R);
-  poly(p, [[10, 17], [2, 19], [4, 23], [10, 24]], BK); p.rect(3, 21, 7, 1, '#a86a10'); p.set(2, 20, '#a86a10'); // hooked beak
-  eye(p, 14, 17, 2.4, c.eye || '#3a2a10');
-  for (const x of [26, 34]) { limb(p, x, 40, x - 1, 49, 1.4, 1.2, BK); for (const d of [-3, 0, 3]) limb(p, x - 1, 49, x - 1 + d, 52, 1, 0.8, BK[2]); } // legs and talons
-  if (c.crest) for (let i = 0; i < 3; i++) chain(p, [[18 + i * 2, 12], [16 + i * 3, 6], [18 + i * 4, 1]], 1.4, 0.8, ramp(c.crest));
+  // a bird of prey in flight: both wings swept up, long primary feathers, hooked beak, a fan of tail feathers and talons drawn up
+  const p = P(76, 60), body = c.body, wingC = c.wing || shade(body, -0.15), R = ramp(body), W = ramp(wingC), Wf = ramp(shade(wingC, -0.3)), Bl = ramp(c.belly || shade(body, 0.4)), BK = ramp('#f0b83a');
+  const feather = (x0, y0, x1, y1, r, T) => { limb(p, x0, y0, x1, y1, r, r * 0.45, T); limb(p, x0, y0, x0 + (x1 - x0) * 0.85, y0 + (y1 - y0) * 0.85, 0.45, 0.45, T[2]); };
+  // far wing, darker, rising behind the body
+  poly(p, [[30, 22], [34, 12], [40, 6], [46, 4], [44, 12], [40, 20]], Wf);
+  for (let i = 0; i < 5; i++) feather(38 + i * 1.6, 12 + i * 2, 48 + i * 1.2, 1 + i * 3.4, 2.2, Wf);
+  // tail: a fan of long feathers trailing behind
+  for (let i = 0; i < 5; i++) { const a = 0.05 + i * 0.2; feather(50, 36, 50 + Math.cos(a) * 22, 36 + Math.sin(a) * 18, 2.8, i % 2 ? W : ramp(shade(wingC, 0.12))); }
+  // talons drawn up under the belly
+  for (const x of [32, 38]) { limb(p, x, 38, x - 3, 45, 1.6, 1.3, BK); for (const d of [-2.5, 0, 2.5]) limb(p, x - 3, 45, x - 5 + d, 48, 0.9, 0.6, '#2a2018'); }
+  // the body: sleek, chest forward
+  poly(p, [[10, 22], [16, 16], [26, 16], [40, 22], [52, 32], [50, 38], [38, 40], [24, 36], [14, 30]], R);
+  poly(p, [[14, 29], [24, 34], [38, 39], [30, 40], [20, 37]], Bl); for (let i = 0; i < 6; i++) p.set(18 + i * 3.4, 31 + i * 1.3, Bl[2]); // pale breast, barred
+  // near wing: coverts and then long primaries spread like fingers
+  poly(p, [[24, 24], [28, 14], [36, 6], [46, 2], [52, 4], [50, 12], [42, 20], [34, 28]], W);
+  for (let i = 0; i < 6; i++) feather(44 + i * 1.4, 6 + i * 2.4, 66 - i * 0.6, -1 + i * 5.2, 2.6, i % 2 ? W : ramp(shade(wingC, 0.1))); // primaries
+  for (let i = 0; i < 4; i++) p.sell(30 + i * 4, 18 - i * 3.4, 3, 2.2, ramp(shade(wingC, 0.2))); // a row of scalloped coverts
+  for (let i = 0; i < 4; i++) feather(34 + i * 3, 24 - i * 2, 40 + i * 4.5, 32 - i * 1.5, 1.8, W); // secondaries
+  // head: brow ridge over the eye, hooked beak
+  p.sell(15, 18, 7.5, 6.5, R);
+  poly(p, [[10, 15], [4, 15], [1, 18], [2, 23], [4, 20], [10, 21]], BK); poly(p, [[9, 21], [4, 21], [6, 23], [10, 23]], ramp('#c88a2a')); p.set(7, 16, '#6a4a1a'); // hooked beak, nostril
+  eye(p, 14, 17, 2.2, c.eye && c.eye !== '#ffe04a' ? c.eye : '#e8a020'); limb(p, 11, 14.5, 18, 14, 0.8, 0.8, shade(body, -0.45)); // fierce brow
+  if (c.crest) for (let i = 0; i < 4; i++) feather(18, 14 + i, 30 + i * 2, 4 + i * 4, 1.8, ramp(c.crest)); // plumes swept back
   return p.outline();
 };
 M.frog = (c) => {
@@ -184,14 +285,30 @@ M.turtle = (c) => {
   return p.outline();
 };
 M.crab = (c) => {
-  const p = P(62, 42), R = ramp(c.body), D = ramp(shade(c.body, -0.2));
-  for (let i = 0; i < 3; i++) { chain(p, [[22 - i * 2, 28], [12 - i * 4, 31], [8 - i * 4, 40]], 2, 1.2, D); chain(p, [[40 + i * 2, 28], [50 + i * 4, 31], [54 + i * 4, 40]], 2, 1.2, D); } // walking legs
-  p.sell(31, 25, 18, 10, R); p.rect(14, 28, 34, 3, R[2]);
-  for (let i = 0; i < 5; i++) p.set(20 + i * 5, 19 + (i % 2), R[0]);
-  // big claws raised on arms
-  for (const s of [-1, 1]) { const x = 31 + s * 18; chain(p, [[31 + s * 12, 24], [x, 18], [x + s * 4, 12]], 2.6, 2.6, R); p.sell(x + s * 5, 8, 7, 5.5, R); poly(p, [[x + s * 1, 4], [x + s * 7, 0], [x + s * 12, 2], [x + s * 6, 6]], R); p.rect(Math.min(x + s * 2, x + s * 10), 5, 8, 1, '#3a0a0a'); }
-  for (const x of [26, 36]) { limb(p, x, 17, x, 10, 1, 1, R[2]); p.ell(x, 9, 2, 2, '#1c1424'); p.set(x - 1, 8, '#fff'); } // stalk eyes
-  p.rect(28, 24, 6, 1, '#3a0a0a');
+  // seen from the front: a wide shell with a jagged rim, jointed legs, and two big pincers raised
+  const p = P(80, 54), R = ramp(c.body), D = ramp(shade(c.body, -0.28)), L = ramp(shade(c.body, 0.35)), cx = 40;
+  const leg = (s, i, T) => { const bx = cx + s * (10 + i * 3.5), by = 34 + i * 1.5, kx = cx + s * (19 + i * 5.5), ky = 27 + i * 2.5, tx = cx + s * (21 + i * 5.8), ty = 49 + (i % 2); limb(p, bx, by, kx, ky, 2.4, 2, T); limb(p, kx, ky, tx, ty, 2, 0.6, T); p.set(kx, ky - 1, T[0]); };
+  for (let i = 3; i >= 0; i--) { leg(-1, i, D); leg(1, i, D); }
+  // shell
+  p.sell(cx, 32, 22, 11, R); p.sell(cx, 37, 18, 5, D);
+  for (let i = 0; i < 9; i++) { const x = cx - 18 + i * 4.5; poly(p, [[x - 2, 24 - Math.abs(i - 4) * -0.4 + Math.abs(i - 4) * 1.2], [x, 19.5 + Math.abs(i - 4) * 1.2], [x + 2, 24 + Math.abs(i - 4) * 1.2]], R); } // the jagged front rim
+  chain(p, [[cx - 8, 26], [cx - 5, 32], [cx, 34], [cx + 5, 32], [cx + 8, 26]], 0.6, 0.6, R[2]); chain(p, [[cx, 34], [cx, 40]], 0.6, 0.6, R[2]); // grooves on the shell
+  p.sell(cx - 9, 27, 5, 2.4, L); for (const [x, y] of [[cx + 10, 30], [cx + 14, 33], [cx - 14, 33], [cx + 6, 37], [cx - 4, 37]]) p.ell(x, y, 1.2, 1, R[2]);
+  // mouth parts
+  for (const s of [-1, 1]) limb(p, cx + s * 2, 38, cx + s * 3, 42, 1, 0.6, D[2]);
+  // eyes on stalks
+  for (const s of [-1, 1]) { limb(p, cx + s * 4, 24, cx + s * 6, 15, 1.2, 1, R); p.ell(cx + s * 6, 13.5, 2.4, 2.4, '#1c1424'); p.set(cx + s * 6 - 1, 12.5, '#ffffff'); }
+  // arms and pincers: short arms, big swollen palms, two curved fingers with a clear gap between them
+  const claw = (s, big) => {
+    const k = big ? 1.15 : 0.95, px = cx + s * 25, py = 23;
+    chain(p, [[cx + s * 14, 32], [cx + s * 24, 31], [px, py + 4]], 3.6, 4, R); p.set(cx + s * 22, 29, L[0]);
+    chain(p, [[px - s * 3 * k, py - 3 * k], [px - s * 6.5 * k, py - 10 * k], [px - s * 5.5 * k, py - 16 * k]], 2.8 * k, 0.6, D); // the fixed finger, inside
+    chain(p, [[px + s * 2.5 * k, py - 3 * k], [px + s * 3 * k, py - 12 * k], [px - s * 0.5 * k, py - 18 * k], [px - s * 3.5 * k, py - 19 * k]], 3.4 * k, 0.6, R); // the moving finger, outside and bigger
+    for (let i = 0; i < 3; i++) { p.set(px - s * (4 + i * 0.2) * k, py - (8 + i * 2.6) * k, '#f4ecd8'); p.set(px - s * (0.2 - i * 0.3) * k, py - (9 + i * 2.6) * k, '#f4ecd8'); } // teeth along the gap
+    p.sell(px, py, 6.5 * k, 5.5 * k, R); p.sell(px - s * 2 * k, py - 1 * k, 3 * k, 2.2 * k, L); // swollen palm
+    for (const [x, y] of [[px + s * 3, py + 2], [px - s * 1, py + 4], [px + s * 4, py - 2]]) p.set(x, y, R[2]);
+  };
+  claw(-1, true); claw(1, false);
   return p.outline();
 };
 M.fish = (c) => {
@@ -216,17 +333,35 @@ M.octopus = (c) => {
   return p.outline();
 };
 M.serpent = (c) => {
-  const p = P(112, 100), R = ramp(c.body), B = ramp(c.belly || '#f0e0b0'), F = ramp(c.fin || '#5ac8e0');
-  const body = []; for (let i = 0; i <= 22; i++) { const t = i / 22; body.push([84 - t * 46 + Math.sin(t * 7) * 14, 94 - t * 70]); }
-  for (let i = 4; i < 20; i += 4) poly(p, [[body[i][0] + 6, body[i][1] - 4], [body[i][0] + 16, body[i][1] - 10], [body[i][0] + 10, body[i][1] + 4]], F); // fins along the back
-  chain(p, body, 13, 7, R);
-  for (let i = 0; i < 20; i++) p.ell(body[i][0] - 7 + i * 0.25, body[i][1], 2.2, 3, B[i % 2]);
-  for (let i = 0; i < 20; i += 2) p.set(body[i][0] + 4, body[i][1] - 2, R[0]);
-  for (let i = 0; i < 6; i++) poly(p, [[40 + i * 4, 18], [46 + i * 5, 2 + (i % 2) * 3], [48 + i * 4, 18]], F); // crest frill
-  p.sell(32, 22, 17, 12, R);
-  poly(p, [[2, 22], [18, 14], [24, 22], [18, 32], [4, 30]], R); p.rect(3, 27, 18, 2, '#3a0a1a'); teeth(p, 5, 26, 19, '#fff', 3, 3);
-  glowEye(p, 26, 16, c.eye || '#ffe03a', 4, 3); p.set(27, 16, OL);
-  chain(p, [[8, 28], [2, 36], [6, 42]], 1.2, 0.6, R[2]); // whisker
+  // a sea serpent: coils resting on the ground, the neck rising in an S, a webbed fin down its back and a frilled, fanged head
+  const p = P(108, 100), R = ramp(c.body), Dk = ramp(shade(c.body, -0.3)), B = ramp(c.belly || '#f0e0b0'), F = ramp(c.fin || '#5ac8e0');
+  const cx = 62, cy = 86, rx = 30, ry = 8;
+  const arc = (a0, a1, n) => { const out = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; out.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); } return out; };
+  // tail curling up at the back, with a fin
+  chain(p, [[cx + rx, cy], [cx + rx + 8, cy - 8], [cx + rx + 10, cy - 18], [cx + rx + 5, cy - 24]], 7, 2, R); poly(p, [[cx + rx + 5, cy - 22], [cx + rx + 2, cy - 34], [cx + rx + 12, cy - 30]], F);
+  chain(p, arc(Math.PI, Math.PI * 2, 14), 8, 8, Dk); // back of the coil
+  for (let i = 1; i < 6; i++) { const [x, y] = arc(Math.PI, Math.PI * 2, 6)[i]; poly(p, [[x - 4, y - 6], [x, y - 13], [x + 4, y - 6]], ramp(shade(c.fin || '#5ac8e0', -0.2))); }
+  // the neck: rising from the front of the coil
+  const neck = [[cx - rx + 4, cy + 4], [28, 74], [27, 62], [36, 50], [40, 38], [34, 27], [26, 21]];
+  const pts = []; for (let i = 0; i < neck.length - 1; i++) for (let t = 0; t < 1; t += 0.25) pts.push([neck[i][0] + (neck[i + 1][0] - neck[i][0]) * t, neck[i][1] + (neck[i + 1][1] - neck[i][1]) * t]); pts.push(neck[neck.length - 1]);
+  // webbed fin along the back of the neck (the right side as it rises)
+  for (let i = 2; i < pts.length - 2; i += 2) { const [x, y] = pts[i], [x2, y2] = pts[i + 2], nx = (y2 - y), ny = -(x2 - x), l = Math.hypot(nx, ny) || 1, ox = -nx / l, oy = -ny / l, e = 9 + (i % 4) * 1.5; poly(p, [[x + ox * 5, y + oy * 5], [x + ox * (6 + e) + 2, y + oy * (6 + e) - 2], [x2 + ox * 5, y2 + oy * 5]], F); limb(p, x + ox * 5, y + oy * 5, x + ox * (6 + e) + 2, y + oy * (6 + e) - 2, 0.6, 0.4, F[2]); }
+  chain(p, arc(0, Math.PI, 16), 9, 9, R); // front of the coil
+  chain(p, pts, 9.5, 7, R);
+  // belly plates down the front of the neck and along the coil
+  for (let i = 1; i < pts.length - 2; i++) { const [x, y] = pts[i], [x2, y2] = pts[i + 1], nx = (y2 - y), ny = -(x2 - x), l = Math.hypot(nx, ny) || 1, ox = nx / l, oy = ny / l; limb(p, x + ox * 3, y + oy * 3, x + ox * 8, y + oy * 8, 1.6, 1.6, B[i % 2 ? 1 : 0]); }
+  for (let i = 1; i < 16; i++) { const [x, y] = arc(0, Math.PI, 16)[i]; limb(p, x, y + 4, x, y + 8, 1.4, 1.4, B[i % 2 ? 1 : 0]); }
+  for (let i = 0; i < pts.length; i += 2) p.set(pts[i][0] + 2, pts[i][1] - 1, R[0]); spots(p, 14, 40, 78, 44, 10, R[0], true);
+  // head: frilled cheek fins, long snout, jaws open with fangs
+  for (let i = 0; i < 4; i++) { const a = -0.9 + i * 0.5; poly(p, [[28, 19], [28 + Math.cos(a) * 16, 19 + Math.sin(a) * 13 - 3], [28 + Math.cos(a + 0.35) * 16, 19 + Math.sin(a + 0.35) * 13 - 3]], F); limb(p, 28, 19, 28 + Math.cos(a) * 16, 19 + Math.sin(a) * 13 - 3, 0.6, 0.4, F[2]); }
+  p.sell(22, 17, 9, 7, R);
+  poly(p, [[16, 11], [4, 13], [0, 16], [1, 19], [16, 20]], R); // upper jaw
+  poly(p, [[16, 23], [4, 26], [2, 29], [18, 27]], Dk); // lower jaw, dropped open
+  poly(p, [[16, 20], [2, 20], [3, 25], [16, 23]], '#6a1a2a'); limb(p, 6, 23, 14, 22, 1, 1, '#c84a5a'); // mouth and tongue
+  for (let x = 3; x < 15; x += 3) { p.set(x, 20, '#ffffff'); p.set(x, 21, '#ffffff'); p.set(x + 1, 25, '#ffffff'); p.set(x + 1, 24, '#ffffff'); }
+  p.set(2, 14, OL); glowEye(p, 18, 13, c.eye || '#ffe03a', 4, 2); p.set(18, 14, OL); limb(p, 14, 11, 24, 10, 1, 0.8, Dk[2]); // nostril, eye, brow ridge
+  chain(p, [[4, 18], [0, 26], [3, 34]], 1, 0.5, R[2]); // whisker
+  for (let i = 0; i < 3; i++) chain(p, [[22 + i * 3, 11], [26 + i * 4, 5], [32 + i * 4, 3]], 1.6, 0.5, F); // little horns
   return p.outline();
 };
 M.worm = (c) => {
@@ -262,19 +397,30 @@ M.spider = (c) => {
   return p.outline();
 };
 M.hydra = (c) => {
-  const n = c.heads || 3, p = P(82, 74), R = ramp(c.body), B = ramp(c.belly || '#e8d8a0');
-  chain(p, [[66, 58], [76, 52], [80, 42]], 6, 2, R);
-  p.sell(46, 58, 26, 14, R); p.sell(44, 62, 18, 8, B);
-  limb(p, 32, 64, 30, 72, 5, 4, R); limb(p, 60, 64, 62, 72, 5, 4, R);
-  for (let h = 0; h < n; h++) {
-    const bx = 34 + h * (28 / Math.max(1, n - 1)), top = 12 + (h % 2) * 12, hx = bx - 18;
-    chain(p, [[bx, 54], [bx - 4, 40], [bx - 12, top + 14], [hx + 4, top + 2]], 5.5, 4, R);
-    for (let i = 0; i < 4; i++) p.set(bx - 5 - i * 3, 46 - i * 8, B[1]);
-    p.sell(hx, top, 8, 6, R); poly(p, [[hx - 18, top + 1], [hx - 4, top - 3], [hx - 2, top + 6], [hx - 16, top + 6]], R);
-    p.rect(hx - 16, top + 4, 13, 1, '#3a0a1a'); teeth(p, hx - 15, top + 3, hx - 5, '#fff', 0, 3);
-    glowEye(p, hx - 3, top - 2, c.eye || '#ffe03a', 3, 2);
-    chain(p, [[hx + 2, top - 5], [hx + 6, top - 10], [hx + 10, top - 12]], 1.6, 0.6, R[0]);
-  }
+  // a heavy four-legged body; long necks fan out from the shoulders, each with its own fanged head
+  const n = c.heads || 3, p = P(96, 82), R = ramp(c.body), B = ramp(c.belly || shade(c.body, 0.45)), Dk = ramp(shade(c.body, -0.25));
+  const spots0 = { 2: [[18, 26], [36, 10]], 3: [[12, 30], [28, 8], [46, 20]], 5: [[8, 36], [16, 16], [32, 4], [48, 14], [58, 30]] };
+  const heads = spots0[n] || spots0[3];
+  chain(p, [[70, 62], [82, 60], [90, 52], [92, 44]], 7, 1.5, R); for (let i = 0; i < 4; i++) poly(p, [[72 + i * 5, 56 - i * 2], [75 + i * 5, 50 - i * 3], [78 + i * 5, 56 - i * 2.5]], Dk); // tail with spines
+  limb(p, 68, 62, 72, 76, 5, 4, Dk); limb(p, 42, 62, 40, 76, 5, 4, Dk); // far legs
+  p.sell(56, 60, 20, 12, R); p.sell(54, 66, 15, 5, B);
+  for (let i = 0; i < 5; i++) poly(p, [[44 + i * 7, 50 - (i === 2 ? 1 : 0)], [47 + i * 7, 43], [50 + i * 7, 50]], Dk); // back ridge
+  limb(p, 62, 64, 64, 78, 5.5, 4.5, R); limb(p, 46, 64, 46, 78, 5.5, 4.5, R); // near legs
+  for (const x of [38, 42, 46, 60, 64, 68]) limb(p, x, 78, x - 1.5, 80, 1, 0.6, '#f4ecd8'); // claws
+  heads.map((h, i) => [h, i]).sort((a, b) => b[0][0] - a[0][0]).forEach(([[hx, hy], i]) => {
+    const back = i % 2 === 1, T = back ? Dk : R, bx = 40 + i * (14 / Math.max(1, n - 1));
+    const pts = [[bx, 58], [bx - 4, 46], [(bx + hx) / 2 + 6, (46 + hy) / 2 + 4], [hx + 9, hy + 4]];
+    chain(p, pts, 6, 4.2, T);
+    for (let k = 0; k < 3; k++) { const t = 0.15 + k * 0.28, a = pts[Math.floor(t * 3)], b = pts[Math.floor(t * 3) + 1], f = t * 3 % 1; p.ell(a[0] + (b[0] - a[0]) * f - 3, a[1] + (b[1] - a[1]) * f, 1.6, 2.2, B[k % 2]); } // belly scales down the neck
+    // the head, facing left: skull, long snout, jaw a little open, horns sweeping back
+    chain(p, [[hx + 5, hy - 3], [hx + 11, hy - 7], [hx + 16, hy - 8]], 1.8, 0.5, ramp('#e8e0c8')); chain(p, [[hx + 6, hy], [hx + 12, hy - 2], [hx + 16, hy - 1]], 1.4, 0.5, ramp('#e8e0c8'));
+    p.sell(hx + 4, hy, 6.5, 5.5, T);
+    poly(p, [[hx, hy - 4], [hx - 11, hy - 2], [hx - 12, hy + 1], [hx, hy + 2]], T); // upper jaw
+    poly(p, [[hx + 1, hy + 4], [hx - 9, hy + 4], [hx - 8, hy + 6], [hx + 2, hy + 7]], Dk); // lower jaw
+    poly(p, [[hx + 1, hy + 2], [hx - 11, hy + 1], [hx - 9, hy + 4], [hx + 1, hy + 4]], '#6a1a2a');
+    for (let x = hx - 10; x < hx; x += 3) { p.set(x, hy + 2, '#ffffff'); p.set(x + 1, hy + 3, '#ffffff'); }
+    p.set(hx - 11, hy - 2, OL); glowEye(p, hx + 1, hy - 3, c.eye || '#ffe03a', 3, 2); p.set(hx + 1, hy - 2, OL); limb(p, hx - 2, hy - 5, hx + 5, hy - 5, 0.8, 0.8, Dk[2]);
+  });
   return p.outline();
 };
 M.dragon = (c) => {

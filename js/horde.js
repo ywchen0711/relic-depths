@@ -167,7 +167,7 @@ for (const [ki, kind] of kinds.entries()) {
     const id = `m_h${++n}`;
     const name = `${el ? EL_W[el] : ''}${MECH_W[mech]}${noun}`;
     const pal = EL_C[el || 'none'], body = pal[h % pal.length];
-    const colors = { body, eye: el === 'dark' ? '#ff3a6a' : el === 'light' ? '#4a8aff' : '#ffe04a', wing: shade(body, -0.32), mane: shade(body, -0.25), belly: shade(body, 0.4), horn: '#e8e0c8', cloth: shade(body, -0.4), shell: shade(body, -0.3), leaf: shade(body, -0.2), trim: '#e8c050', orb: pal[(h + 1) % pal.length], crown: mech === 'intimidate' ? 1 : undefined };
+    const colors = { body, elem: el || undefined, eye: el === 'dark' ? '#ff3a6a' : el === 'light' ? '#4a8aff' : '#ffe04a', wing: shade(body, -0.32), mane: shade(body, -0.25), belly: shade(body, 0.4), horn: '#e8e0c8', cloth: shade(body, -0.4), shell: shade(body, -0.3), leaf: shade(body, -0.2), trim: '#e8c050', orb: pal[(h + 1) % pal.length], crown: mech === 'intimidate' ? 1 : undefined };
     const [mh, ma, md, mm, ms] = STAT_M[kind], [xh, xa, xd, xm, xs] = MECH_M[mech];
     const E = {
       name, kind, colors, lv,
