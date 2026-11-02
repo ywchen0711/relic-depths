@@ -321,7 +321,7 @@ class Game {
     let res;
     for (;;) {
       try { res = await this.battle.run(opts); } catch (e) { // never leave the player stuck on a black screen
-        console.error(e); this.battle.active = false;
+        console.error(e); this.battle.active = false; this.ui.toast('戰鬥發生錯誤，已提前結束', 3000);
         try { this.battle.ui?.hide(); this.battle.clearUnits(); } catch (e2) { console.error(e2); }
         res = opts.random ? 'flee' : 'win';
       }
