@@ -43,11 +43,14 @@ const BG = {
   desert: { tile: ['sand', '#e4c488'], side: ['stonewall', '#c8a070'], sky: ['#e8a860', '#f8e8c0'], props: [['cactus', {}], ['rock', { color: '#c8a070' }], ['skulls', {}], ['deadtree', { bark: '#a08a6a' }]], light: 'day', fog: '#f0d8a8' },
   badlands: { tile: ['dirt', '#b07a4a'], side: ['stonewall', '#a06a48'], sky: ['#d87a4a', '#f4d0a0'], props: [['deadtree', {}], ['rock', { color: '#a06a48' }], ['bones', {}], ['cactus', {}]], light: 'day', fog: '#e0a070' },
   seacave: { tile: ['cave', '#4a6a70'], side: ['cave', '#2e4850'], sky: ['#04101a', '#0a2030'], props: [['coral', {}], ['seaweed', {}], ['rock', { color: '#3a5a60' }], ['coral', { color: '#ffb08a' }]], light: 'deep', fog: '#081a20', torches: true },
+  skyRuin: { tile: ['temple', '#a49eb8'], side: ['cloud', '#c4c0d8'], sky: ['#1e2a64', '#c08aa8'], props: [['crystal', { color: '#a080e8' }], ['obelisk', {}]], light: 'skyRuin', fog: '#4a4a7a', cloud: '#5a5a8a', pillars: true, clouds: true },
+  skyGold: { tile: ['temple', '#c0b088'], side: ['cloud', '#d8c8b0'], sky: ['#3a2a5a', '#e0905a'], props: [['crystal', { color: '#ffc86a' }], ['obelisk', { rune: '#ffd88a' }]], light: 'skyGold', fog: '#7a5a5a', cloud: '#9a6a62', pillars: true, clouds: true },
   hell: { tile: ['cave', '#5a2a24'], side: ['cave', '#2a1210'], sky: ['#1a0404', '#5a1408'], props: [['spikes', {}], ['skulls', {}], ['tentacle', { color: '#8a2a2a' }]], light: 'hell', fog: '#200806', torches: true },
   castle: { tile: ['brick', '#4a3a40'], side: ['brick', '#2e2428'], sky: ['#0a0408', '#2a0a14'], props: [['banner', { color: '#8a1a1a' }], ['skulls', {}], ['brazier', {}], ['spikes', {}]], light: 'void', fog: '#14080c', pillars: true, torches: true },
   arena: { tile: ['sand', '#d8c08a'], side: ['brick', '#a87a5a'], sky: ['#5a96e8', '#f0e8d0'], props: [['bush', {}]], light: 'day', fog: '#e8d8b8', pillars: true },
 };
 const LIGHT = {
+  skyRuin: [['#ffd8b8', 1.6], ['#8a94d0', '#3a3050', 0.75]], skyGold: [['#ffb878', 1.7], ['#c09a90', '#3a2a3a', 0.75]],
   hell: [['#ff8a5a', 1.1], ['#a84a2a', '#2a0a06', 0.75]],
   day: [['#fff0d8', 2.6], ['#c4dcff', '#8a7a5a', 1.0]], forest: [['#f0f4c8', 2.0], ['#9ac09a', '#3a4a2a', 0.8]], cave: [['#8a8aaa', 0.6], ['#5a5a7a', '#1a1418', 0.7]],
   deep: [['#6ac8ff', 0.8], ['#3a7a9a', '#0a1a2a', 0.7]], sky: [['#fff8f0', 2.8], ['#d0dcff', '#d8c8e8', 1.1]], void: [['#c8a0ff', 1.2], ['#6a4a8a', '#1a0a2a', 0.7]],
@@ -96,7 +99,7 @@ export class Battle {
     }
     if (B.pillars) for (const x of [-9, -5, 5, 9]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 5, 10), new THREE.MeshStandardMaterial({ map: tileTex(B.side[0], B.side[1]), roughness: 0.9 })); p.position.set(x, 2.5, -6.5); p.castShadow = true; st.add(p); }
     if (B.sea) { const sea = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), new THREE.MeshStandardMaterial({ color: '#2a8ac8', roughness: 0.2, metalness: 0.2 })); sea.rotation.x = -Math.PI / 2; sea.position.set(0, -0.2, -18); st.add(sea); }
-    if (B.clouds) { const cl = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: bgKey === 'void' ? '#4a2a5a' : '#f4f0ff', fog: false })); cl.rotation.x = -Math.PI / 2; cl.position.y = -8; st.add(cl); ground.scale.set(0.6, 0.6, 1); }
+    if (B.clouds) { const cl = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: B.cloud || (bgKey === 'void' ? '#4a2a5a' : '#f4f0ff'), fog: false })); cl.rotation.x = -Math.PI / 2; cl.position.y = -8; st.add(cl); ground.scale.set(0.6, 0.6, 1); }
     const L = LIGHT[B.light] || LIGHT.day;
     this.sun.color.set(L[0][0]); this.sun.intensity = L[0][1]; this.hemi.color.set(L[1][0]); this.hemi.groundColor.set(L[1][1]); this.hemi.intensity = L[1][2];
     for (const [i, l] of this.pt.entries()) { l.intensity = B.torches ? 8 : 0; l.position.set(-8 + i * 8, 3, -5); }

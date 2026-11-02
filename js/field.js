@@ -20,6 +20,8 @@ export const LIGHTS = {
   deep: { sun: ['#6ac8ff', 0.35, [0.2, 1, 0.4]], hemi: ['#2a6a8a', '#0a1a2a', 0.55], exp: 1.15 },
   sky: { sun: ['#fff8f0', 2.8, [0.4, 1, 0.6]], hemi: ['#d0dcff', '#d8c8e8', 1.1], exp: 1.0 },
   void: { sun: ['#c8a0ff', 0.9, [0.3, 1, 0.5]], hemi: ['#5a3a7a', '#1a0a2a', 0.6], exp: 1.1 },
+  skyRuin: { sun: ['#ffd8b8', 1.5, [-0.6, 0.8, 0.5]], hemi: ['#8a94d0', '#3a3050', 0.85], exp: 1.05 },
+  skyGold: { sun: ['#ffb878', 1.6, [-0.7, 0.7, 0.5]], hemi: ['#c09a90', '#3a2a3a', 0.7], exp: 1.0 },
   hell: { sun: ['#ff8a5a', 0.8, [0.3, 1, 0.5]], hemi: ['#a84a2a', '#2a0a06', 0.6], exp: 1.12 },
 };
 
