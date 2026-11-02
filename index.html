@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="遺物深淵">
+<meta name="theme-color" content="#000000">
+<title>遺物深淵 Relic Depths</title>
+<meta name="description" content="回合制打寶 RPG：十種職業、八十棵技能樹、隨機詞綴裝備、暗金與套裝。">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud">
+  <div id="area"></div>
+  <div id="objective" style="display:none"></div>
+  <div id="danger"><i></i></div>
+  <canvas id="minimap" title="地圖（M）"></canvas>
+  <div id="hudbottom"><div id="hudparty"></div><div id="hudgil"></div></div>
+</div>
+
+<div id="battle"></div>
+<div id="dialog"></div>
+<div id="ui"></div>
+<div id="toasts"></div>
+
+<div id="touch">
+  <div id="tzone"></div>
+  <div id="tpad"><div id="tknob"></div></div>
+  <div class="tbtns">
+    <button data-k="menu" class="tb tb-menu">☰</button>
+    <button data-k="mount" class="tb tb-mount">🐦</button>
+    <button data-k="cancel" class="tb tb-b">B</button>
+    <button data-k="ok" class="tb tb-a">A</button>
+  </div>
+</div>
+
+<div id="swirl"></div>
+<div id="fade"></div>
+<div id="chapter"></div>
+<div id="gameover"></div>
+<div id="ending"></div>
+
+<div id="title">
+  <div class="tt-logo">
+    <div class="tt-gem"></div>
+    <h1>遺物深淵</h1>
+    <div class="tt-en">RELIC DEPTHS</div>
+  </div>
+  <div class="tt-menu"></div>
+  <div class="tt-help"><span class="kb">鍵盤：方向鍵移動　Z / Enter 確定　X / Esc 取消　C 選單　M 地圖　Shift 跑步　Q / E 或滑鼠拖曳旋轉視角</span><span class="tc">左半邊拖曳移動・右半邊拖曳轉視角<br>點對話框繼續・選單直接點選・☰ 開啟選單・點右上小地圖看全圖</span></div>
+</div>
+
+<script type="module" src="js/main.js?v=1"></script>
+</body>
+</html>
