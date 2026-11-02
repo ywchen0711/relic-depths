@@ -128,6 +128,7 @@ export class UI {
   // ---------------------------------------------------------------- main menu
   async mainMenu() {
     const G = this.G, S = this.S;
+    this.closeMenus = false;
     this.G.audio.sfx('ok');
     let start = 0;
     for (;;) {
@@ -140,6 +141,7 @@ export class UI {
       const act = opts[i][1];
       if (typeof act === 'string') { this.hud(); return act; }
       try { await act(); } catch (e) { console.error(e); this.toast('這個畫面發生錯誤，已返回選單'); }
+      if (this.closeMenus) break;
     }
     this.hud();
     if (this.G.field?.player && this.G.mode === 'field') this.G.field.setLeader(S.party[0]);
@@ -218,6 +220,7 @@ export class UI {
       if (i < 0) return;
       start = i;
       try { await rows[i][2](); } catch (err) { console.error(err); this.toast('這個畫面發生錯誤'); }
+      if (this.closeMenus) return;
     }
   }
   // pick this hero's echo crystal from the ones owned, take it off, or raise its stars
@@ -416,6 +419,7 @@ export class UI {
         const i = await this.choose(list.map(it => ({ label: itemName(it), sub: '×' + S.items[it], desc: ITEMS[it]?.desc || (GEAR[it] ? this.gearKind(GEAR[it]) + '　' + this.gearLine(it) : '') })), { title: rows[c].label, cls: 'items', info: (k) => GEAR[list[k]] ? this.gearHTML(list[k]) : '' });
         if (i < 0) break;
         await this.useFieldItem(list[i]);
+        if (this.closeMenus) return;
       }
     }
   }
@@ -423,7 +427,7 @@ export class UI {
     const S = this.S, I = ITEMS[id];
     if (!I || !I.use || I.use.dmg || I.use.escape || I.use.status && !I.use.self || I.use.analyze || I.use.cast || I.use.buff || I.use.evadeT) { if (I?.use) this.toast('戰鬥中才能使用'); return; }
     const spend = () => { S.items[id]--; if (!S.items[id]) delete S.items[id]; this.hud(); };
-    if (I.use.townPortal) { const f = this.G.field; if (f.def.town) { this.toast('已經在營地了'); return; } spend(); S.portal = { map: f.mapId, x: Math.floor(f.player.x), z: Math.floor(f.player.z) }; this.G.audio.sfx('flee'); this.G.menuOpen = false; await this.G.warp('town', 15, 18, 'down'); this.toast('從營地的藍色水晶可以回到原處'); return; }
+    if (I.use.townPortal) { const f = this.G.field; if (f.def.town) { this.toast('已經在營地了'); return; } spend(); S.portal = { map: f.mapId, x: Math.floor(f.player.x), z: Math.floor(f.player.z) }; this.G.audio.sfx('flee'); this.G.menuOpen = false; this.closeMenus = true; await this.G.warp('town', 15, 18, 'down'); this.toast('走進營地的藍色傳送門，或在水晶選「回到傳送門」，就能回到原處', 3500); return; }
     if (I.use.tent) { if (!this.G.nearSave()) { this.toast('要在存檔水晶旁使用'); return; } spend(); const { healAll } = await import('./party.js?v=1'); healAll(S); this.G.audio.sfx('heal'); this.toast('全員完全回復了！'); return; }
     if (I.use.meal) { S.meal = { fx: I.use.meal, n: 5, name: I.name }; spend(); this.G.audio.sfx('heal'); this.toast(`吃了${I.name}！之後5場戰鬥都有效果`); return; }
     if (I.use.repel) { S.repel = I.use.repel; S.lure = 0; spend(); this.G.audio.sfx('item'); this.toast('敵人不會靠近了'); return; }

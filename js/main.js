@@ -222,7 +222,8 @@ class Game {
       else if (it.kind === 'save') {
         this.audio.sfx('save'); this.unlockHere(); this.save();
         const to = await this.ui.waypointMenu();
-        if (to && to !== this.field.mapId) { this.busy = false; await this.travel(to); }
+        if (to === 'portal') { const P = this.S.portal; this.busy = false; await this.warp(P.map, P.x, P.z, 'down', { portal: true }); }
+        else if (to && to !== this.field.mapId) { this.busy = false; await this.travel(to); }
       } else if (it.kind === 'tablet') {
         this.S.tablets.push(it.id); it.sprite.visible = false; f.built.interact = f.built.interact.filter(x => x !== it);
         addItem(this.S, 'tablet', 1); this.audio.sfx('item'); await this.ui.say('', `撿到了石板碎片！（${this.S.tablets.length}/12）`, null);
@@ -379,8 +380,11 @@ class Game {
   // a town portal: back to the camp, and a glowing way back to where you were
   placePortal() {
     const T = MAPS.town; T.objs = T.objs.filter(o => !o.portal);
-    const P = this.S.portal; if (!P || !MAPS[P.map]) return;
-    T.objs.push({ k: 'bigcrystal', x: 21, z: 19, color: '#4a8aff', portal: true }, { k: 'warp', x: 21, z: 20, w: 1, d: 1, to: P.map, tx: P.x, tz: P.z, dir: 'down', portal: true });
+    const P = this.S.portal; if (!P) return;
+    this.ensureMap(P.map); if (!MAPS[P.map]) return; // after loading a save the level is laid out again from its seed
+    const name = MAPS[P.map].name.split('　')[0];
+    // a glowing ring on the ground: step on it to go back (the waypoint crystal offers the same)
+    T.objs.push({ k: 'gate', x: 20, z: 20, w: 3, color: '#4a8aff', label: `▲ 傳送門：${name}`, back: true, portal: true }, { k: 'warp', x: 20, z: 20, w: 3, d: 1, to: P.map, tx: P.x, tz: P.z, dir: 'down', portal: true, label: name });
   }
   hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
   partyFx(id) { return gearFx(this.S, id); }

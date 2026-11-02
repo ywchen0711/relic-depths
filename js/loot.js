@@ -7,7 +7,7 @@
 // An item lives in S.loot[uid] as a small spec; at load it is turned into a GEAR entry under its uid, so the rest of
 // the game (stats, battles, paper dolls) treats it like any other piece of equipment.
 import { GEAR, ELEM, ITEMS } from './data.js?v=1';
-ITEMS.i_tp = { name: '回城卷軸', price: 60, use: { townPortal: true }, field: true, desc: '打開通往營地的傳送門；回來時從營地的藍色水晶走回原地', cat: 'tool' };
+ITEMS.i_tp = { name: '回城卷軸', price: 60, use: { townPortal: true }, field: true, desc: '打開通往營地的傳送門；走進營地的藍色傳送門（或在水晶選「回到傳送門」）就回到原地', cat: 'tool' };
 import { WTYPES, mergeFx, FAM_N, STATUS_N } from './content.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
 import { U2, SETS2, powers } from './loot2.js?v=1';

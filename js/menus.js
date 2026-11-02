@@ -6,6 +6,7 @@ import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, s
 import { CLASSES, CLASS_ORDER, TREES, SKILL_INFO, SKILL_MAX, TREE_REQ } from './classes.js?v=1';
 import { RARITY, rollItem, gambleItem, shopStock, sellPrice, dropLoot } from './loot.js?v=1';
 import { ACTS, DIFFS, WP_LEVELS, mapId } from './dungeon.js?v=1';
+import { MAPS } from './maps.js?v=1';
 import { fxText, WTYPES } from './content.js?v=1';
 
 const P = UI.prototype;
@@ -292,6 +293,7 @@ export function autoBuild(S, id) {
 // ---------------------------------------------------------------- waypoints
 P.waypointMenu = async function () {
   const S = this.S, d = S.diff || 0, rows = [{ label: '暮光營地', sub: '', to: 'town' }];
+  if (S.portal && this.G.field.def.town && MAPS[S.portal.map]) rows.unshift({ label: '<span style="color:#8ab8ff">回到傳送門</span>', sub: MAPS[S.portal.map].name.split('　')[0], to: 'portal' });
   ACTS.forEach((A, a) => WP_LEVELS.forEach(l => { if (S.wp[`d${d}a${a}l${l}`]) rows.push({ label: `${A.n.split('　')[1]}・${A.levels[l][0]}`, sub: `第${a + 1}幕`, to: mapId(a, l) }); }));
   const i = await this.choose(rows, { title: `傳送點　<span style="color:${DIFFS[d].c}">${DIFFS[d].n}</span>`, cls: 'small' });
   return i < 0 ? null : rows[i].to;
