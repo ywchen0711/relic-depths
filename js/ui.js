@@ -1,7 +1,7 @@
 // Menus and windows: dialogue, choices, the main menu, shops, inns, notices and little overlays.
 import { DIFF, DIFF_ORDER, balanceFor } from './balance.js?v=1';
-import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, ECHO_ORDER, EXP_NEXT, SUMMONS, STAR_COST, BOND_EXP, ELEM, WPN, ICON } from './data.js?v=1';
-import { heroStats, skillsOf, apUsed, apCap, equip, canEquip, setEcho, togglePassive, starUp, ownedEchoes, itemName, addItem, echoSkills, EQUIP_SLOTS, SLOT_N, slotFits, gearFx, artsOf, spellsOf, masteryLv, hands, paperLook, itemLook, gearLook } from './party.js?v=1';
+import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, ECHO_ORDER, EXP_NEXT, SUMMONS, STAR_COST, BOND_EXP, ELEM, WPN, ICON , clsOf } from './data.js?v=1';
+import { heroStats, skillsOf, apUsed, apCap, equip, canEquip, setEcho, togglePassive, starUp, ownedEchoes, itemName, addItem, echoSkills, EQUIP_SLOTS, SLOT_N, slotFits, gearFx, artsOf, spellsOf, masteryLv, hands, paperLook, itemLook, gearLook , LEAD_TEXT } from './party.js?v=1';
 import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N, APT, SHIELD_KINDS, TIER_N, FAM_N, TRAIT_N, DROP_N } from './content.js?v=1';
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
@@ -150,7 +150,7 @@ export class UI {
   }
   heroPick(title, all = false) {
     const S = this.S, list = all ? [...S.party, ...S.reserve] : S.party;
-    return this.choose(list.map(id => ({ label: HEROES[id].name, sub: 'Lv ' + S.heroes[id].lv, icon: portrait(id) })), { title }).then(i => i < 0 ? null : list[i]);
+    return this.choose(list.map(id => ({ label: (S.lead === id ? '★ ' : '') + HEROES[id].name, sub: 'Lv ' + S.heroes[id].lv + (id.includes('#') ? '・' + HEROES[clsOf(id)].name : ''), icon: portrait(id) })), { title }).then(i => i < 0 ? null : list[i]);
   }
   statusHTML(id) {
     const S = this.S, h = S.heroes[id], st = heroStats(S, id), H = HEROES[id];
@@ -163,7 +163,7 @@ export class UI {
       <div class="st-sk">技能：${sk.own.map(s => SKILLS[s].name).join('、')}${sk.echo.length ? '<br>迴響技能：' + sk.echo.map(s => SKILLS[s].name).join('、') : ''}</div>
       <div class="st-bio">${H.bio}</div></div></div>`;
   }
-  async statusMenu() { const S = this.S; const list = [...S.party, ...S.reserve]; await this.choose(list.map(id => ({ label: HEROES[id].name, sub: 'Lv ' + S.heroes[id].lv, icon: portrait(id) })), { title: '隊伍狀態', info: (i) => this.statusHTML(list[i]) }); }
+  async statusMenu() { const S = this.S; const list = [...S.party, ...S.reserve]; await this.choose(list.map(id => ({ label: (S.lead === id ? '★ ' : '') + HEROES[id].name, sub: 'Lv ' + S.heroes[id].lv + (id.includes('#') ? '・' + HEROES[clsOf(id)].name : ''), icon: portrait(id) })), { title: '隊伍狀態', info: (i) => this.statusHTML(list[i]) }); }
 
   // ---------------------------------------------------------------- the status hub: everything about one hero, and every setting for them
   fullStatusHTML(id) {
@@ -177,7 +177,7 @@ export class UI {
     const sets = setBonus(EQUIP_SLOTS.map(sl => h.equip[sl]).filter(Boolean)).count;
     const chip = (s) => `<span class="${hid.has(s) ? 'lock' : ''}">${SKILLS[s].name}</span>`;
     return `<div class="st sth"><img class="st-big" src="${fullSprite(id, true)}"><div>
-      <h3 style="color:${H.color}">${H.name} <small>${H.title}　Lv ${h.lv}</small></h3>
+      <h3 style="color:${H.color}">${H.name} <small>${H.title}　Lv ${h.lv}</small></h3>${S.lead === id ? `<div style="color:#ffd84a;font-size:12px">★ 主角：${LEAD_TEXT}</div>` : ''}
       <div class="sth-bar"><span>HP ${h.hp}/${st.hp}</span><span>MP ${h.mp}/${st.mp}</span><span>EXP ${h.exp}/${EXP_NEXT(h.lv)}</span><span>技能點 ${h.sp || 0}</span><span>屬性點 ${h.stp || 0}</span><span>極限 ${h.limit || 0}%</span></div>
       <table class="sth-st"><tr><td>攻擊</td><td>${st.atk}</td><td>防禦</td><td>${st.def}</td><td>魔力</td><td>${st.mag}</td></tr><tr><td>精神</td><td>${st.spr}</td><td>速度</td><td>${st.spd}</td><td>${derived[0][0]}</td><td>${derived[0][1]}</td></tr></table>
       ${derived.length > 1 ? `<div class="tags">${derived.slice(1).map(([k, v]) => `<span>${k} ${v}</span>`).join('')}</div>` : ''}

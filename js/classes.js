@@ -2,7 +2,7 @@
 // element or weapon) and five names; the skills themselves are built from the style, so every tree plays by the same
 // rules: the 1st skill at level 1, then levels 6, 12, 18 and 24, each needing a point in the one before it.
 // Skills go up to level 20; a skill at level n is SKILLS['id@n'] (made on demand, see data.js), stronger each point.
-import { HEROES, SKILLS, ELEM, setSkillScaler } from './data.js?v=1';
+import { HEROES, SKILLS, ELEM, setSkillScaler, alias } from './data.js?v=1';
 import { APT } from './content.js?v=1';
 
 export const TREE_REQ = [1, 6, 12, 18, 24];
@@ -13,7 +13,7 @@ const EL_ANIM = { fire: 'fire', ice: 'ice', thunder: 'thunder', water: 'water', 
 
 // ---------------------------------------------------------------- the ten classes
 // t: [style, theme, [five names], icon]; theme is an element, a weapon type or a keyword the style understands
-export const CLASSES = {
+export const CLASSES = alias({
   barb: {
     name: '狂戰士', title: '北方的戰狂', color: '#d84a3a', wpn: 'axe', weapons: ['axe', 'sword', 'greatsword', 'hammer'], shield: true, styles: ['heavy', 'light'],
     look: { skin: 'tan', hair: '#3a2a20', hairStyle: 'spiky', top: '#7a3a2a', top2: '#c8a060', legs: '#4a3a2a', boots: '#3a2a1a', weapon: 'axe', pauldron: '#8a8a92', beard: '#3a2a20', eyes: '#3a2a20' },
@@ -174,7 +174,7 @@ export const CLASSES = {
       ['tough', 'def', ['工程裝甲', '防爆衣', '絕緣', '自動修復', '機甲'], '🔧'],
     ],
   },
-};
+});
 export const CLASS_ORDER = Object.keys(CLASSES);
 
 // ---------------------------------------------------------------- building a skill from its style
@@ -361,12 +361,12 @@ export const PRE_OF = { 0: [], 5: [0], 1: [0], 2: [5], 3: [1], 6: [1], 4: [2], 7
 export const SYNERGY = 0.03; // +3% to a skill per point in each other skill of the same tree (up to +60%)
 const EW = { fire: '炎', ice: '冰', thunder: '雷', water: '水', wind: '風', earth: '岩', light: '聖', dark: '闇' };
 const WW = { axe: '斧', sword: '劍', greatsword: '大劍', hammer: '鎚', spear: '槍', bow: '弓', gun: '槍', dagger: '刃', katana: '刀', knuckle: '拳', whip: '鞭', boomerang: '迴旋', staff: '杖', rod: '杖', harp: '琴', tome: '書', shield: '盾' };
-export const MINIONS = {
+export const MINIONS = alias({
   necro_4: { w: '亡者', A: { n: '骷髏戰士', kind: 'skeleton', hp: 0.55, atk: 0.6, act: 'mn_claw' }, B: { n: '骷髏法師', kind: 'mage', hp: 0.4, atk: 0.65, act: 'mn_bolt_dark', mag: true }, C: { n: '屍骨巨人', kind: 'golem', hp: 1.7, atk: 0.95, act: 'mn_smash', big: true } },
   ranger_6: { w: '精靈', A: { n: '森林精靈', kind: 'wisp', hp: 0.4, atk: 0.6, act: 'mn_bolt_light', mag: true }, B: { n: '獵鷹', kind: 'bird', hp: 0.45, atk: 0.7, act: 'mn_claw' }, C: { n: '女武神', kind: 'knight', hp: 1.5, atk: 1.0, act: 'mn_smash', big: true } },
   druid_5: { w: '野獸', A: { n: '烏鴉', kind: 'bird', hp: 0.35, atk: 0.55, act: 'mn_claw' }, B: { n: '野狼', kind: 'wolf', hp: 0.6, atk: 0.75, act: 'mn_bite' }, C: { n: '巨熊', kind: 'beast', hp: 1.8, atk: 1.0, act: 'mn_smash', big: true } },
   gunner_3: { w: '機械', A: { n: '小砲台', kind: 'mech', hp: 0.5, atk: 0.6, act: 'mn_bolt_thunder', mag: true }, B: { n: '機械蜂', kind: 'eye', hp: 0.35, atk: 0.7, act: 'mn_claw' }, C: { n: '巨神兵', kind: 'golem', hp: 1.8, atk: 1.0, act: 'mn_smash', big: true } },
-};
+});
 for (const [id, o] of Object.entries({ mn_claw: { name: '攻擊', type: 'phys', pow: 1.0, anim: 'claw' }, mn_bite: { name: '撕咬', type: 'phys', pow: 1.1, anim: 'bite' }, mn_smash: { name: '重擊', type: 'phys', pow: 1.35, anim: 'slash' } })) SKILLS[id] = { tgt: 'enemy', mp: 0, ...o };
 for (const e of ELS) SKILLS['mn_bolt_' + e] = { name: ELEM[e] + '彈', type: 'mag', tgt: 'enemy', pow: 1.0, el: e, anim: EL_ANIM[e], mp: 0 };
 const AURA_N = { auraatk: ['激勵', '戰陣', '王者之風'], auradef: ['守護之誓', '聖盾陣', '聖域之心'], auraspd: ['疾風之誓', '流水陣', '天人之心'], songatk: ['獨唱', '輪唱', '天籟'], songdef: ['守護獨唱', '和聲之陣', '安息天籟'], warcryatk: ['怒吼', '戰陣', '戰神之風'] };
@@ -417,7 +417,7 @@ function extraSlots(style, th, cls, ti) {
 }
 
 // ---------------------------------------------------------------- register everything
-export const TREES = {};      // cls -> [{ id, name, icon, style, skills: [sid x5] }]
+export const TREES = alias({});      // cls -> [{ id, name, icon, style, skills: [sid x5] }]
 export const SKILL_INFO = {}; // sid -> { cls, tree, k, req, passive, fxAt }
 for (const [cls, C] of Object.entries(CLASSES)) {
   TREES[cls] = C.trees.map(([style, th, names, icon], ti) => {

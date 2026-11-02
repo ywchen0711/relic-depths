@@ -1,8 +1,8 @@
 // The new windows: picking a class, skill trees, stat points, the bag, the stash, the shop, gambling, hiring and
 // the waypoints. They are added to the UI class from ui.js so they share its chooser and tooltips.
 import { UI, fullSprite, portrait } from './ui.js?v=1';
-import { HEROES, SKILLS, GEAR, ITEMS, ELEM } from './data.js?v=1';
-import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx } from './party.js?v=1';
+import { HEROES, SKILLS, GEAR, ITEMS, ELEM, clsOf } from './data.js?v=1';
+import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx, hireHero, dismissHero, isLead, MAX_HEROES } from './party.js?v=1';
 import { CLASSES, CLASS_ORDER, TREES, SKILL_INFO, SKILL_MAX, TREE_REQ } from './classes.js?v=1';
 import { RARITY, rollItem, gambleItem, shopStock, sellPrice, dropLoot } from './loot.js?v=1';
 import { ACTS, DIFFS, WP_LEVELS, mapId } from './dungeon.js?v=1';
@@ -250,25 +250,32 @@ P.gambleMenu = async function () {
 
 // ---------------------------------------------------------------- hiring and the party
 P.hireMenu = async function () {
-  const S = this.S, lead = Math.max(...Object.values(S.heroes).map(h => h.lv));
+  const S = this.S;
   for (;;) {
-    const owned = Object.keys(S.heroes);
-    const i = await this.choose(['招募新夥伴', '調整隊伍（最多4人出戰）'], { title: `傭兵隊長　<span class="gil">${S.gil} G</span>`, cls: 'small' });
+    const n = Object.keys(S.heroes).length, cost = 200 + (S.heroes[S.lead]?.lv || 1) * 20, mercs = Object.keys(S.heroes).filter(id => !isLead(S, id));
+    const i = await this.choose([{ label: '招募傭兵', sub: `${cost} G・從等級 1 開始` }, { label: '調整隊伍', sub: '最多 4 人出戰' }, { label: '解雇傭兵', sub: `${mercs.length} 人` }], { title: `傭兵隊長　<span class="gil">${S.gil} G</span>`, cls: 'small' });
     if (i < 0) return;
     if (i === 1) { await this.formationMenu(); continue; }
-    if (owned.length >= CLASS_ORDER.length) { this.toast('所有職業都已經是你的夥伴了'); continue; }
-    const cost = 150 + lead * 90;
-    const c = await this.classSelect(`招募夥伴（${cost} G，等級 ${Math.max(1, lead - 1)}）`, owned);
+    if (i === 2) {
+      if (!mercs.length) { this.toast('沒有可以解雇的傭兵'); continue; }
+      const k = await this.choose(mercs.map(id => ({ label: HEROES[id].name, sub: `${CLASSES[id].name}・Lv ${S.heroes[id].lv}`, icon: portrait(id) })), { title: '解雇哪一位？（裝備會放回背包）' });
+      if (k < 0) continue;
+      const id = mercs[k], nm = HEROES[id].name;
+      if (await this.yesno(`真的要讓 ${nm}（${CLASSES[id].name}）離開嗎？`)) { dismissHero(S, id); this.G.audio.sfx('cancel'); this.toast(`${nm} 離開了隊伍`); this.G.field?.setLeader?.(S.party[0]); }
+      continue;
+    }
+    if (n >= MAX_HEROES) { this.toast(`最多 ${MAX_HEROES} 位夥伴，先解雇一位`); continue; }
+    const c = await this.classSelect(`招募傭兵（${cost} G，從等級 1 開始，同一個職業可以招募好幾位）`);
     if (!c) continue;
     if (S.gil < cost) { this.G.audio.sfx('error'); this.toast('金幣不足'); continue; }
-    S.gil -= cost; addHero(S, c, Math.max(1, lead - 1)); autoBuild(S, c);
-    this.G.audio.sfx('levelup'); this.toast(`${CLASSES[c].name}加入了！${S.party.includes(c) ? '' : '（在待命名單）'}`);
+    S.gil -= cost; const id = hireHero(S, c); autoBuild(S, id);
+    this.G.audio.sfx('levelup'); this.toast(`${HEROES[id].name}（${CLASSES[c].name}）加入了！${S.party.includes(id) ? '' : '（在待命名單）'}`);
   }
 };
 // spend a hired hero's points: two trees of real skills, stats by what the class lives on
 export function autoBuild(S, id) {
   const AUTO = { barb: [0, 4], paladin: [1, 0], sorc: [0, 1], necro: [4, 0], ranger: [0, 1], assassin: [0, 2], druid: [0, 1], monk: [0, 5], bard: [3, 4], gunner: [0, 1] };
-  const h = S.heroes[id], trees = (AUTO[id] || [0, 1]).map(i => TREES[id][i]);
+  const h = S.heroes[id], trees = (AUTO[clsOf(id)] || [0, 1]).map(i => TREES[id][i]);
   let guard = 200;
   while ((h.sp || 0) > 0 && guard-- > 0) {
     const cand = trees.flatMap(t => t.skills).filter(s => !canLearn(S, id, s));

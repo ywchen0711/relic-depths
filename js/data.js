@@ -6,8 +6,11 @@ export const ELEM_COLOR = { fire: '#ff7a3a', ice: '#8ae0ff', thunder: '#ffe04a',
 export const ICON = { fire: '🔥', ice: '❄️', thunder: '⚡', water: '💧', wind: '🌀', earth: '🪨', light: '✨', dark: '🌑', sword: '🗡️', spear: '🔱', dagger: '🔪', staff: '🪄', bow: '🏹', axe: '🪓' };
 
 // ---------------------------------------------------------------- heroes
+// hired heroes can share a class: "barb#2" is a second barbarian, and tables keyed by class read its class's entry
+export const clsOf = (id) => String(id).replace(/#\d+$/, '').replace(/#\d+_/, '_');
+export const alias = (o) => new Proxy(o, { get: (t, k) => (typeof k !== 'string' || k in t) ? t[k] : t[clsOf(k)] });
 // base stats at level 1 and growth per level
-export const HEROES = {
+export const HEROES = alias({
   aren: {
     name: '艾倫', title: '銀翼騎士', wpn: 'sword', color: '#4a7ae0',
     look: { skin: 'light', hair: '#e8c45a', hairStyle: 'spiky', top: '#a8303a', top2: '#2a2a3a', legs: '#2a2838', boots: '#5a3a2a', cape: '#8a1a2a', weapon: 'sword', pauldron: '#c8ccd8', eyes: '#2a4a8a' },
@@ -62,7 +65,7 @@ export const HEROES = {
     limit: 'lim_neo', start: 'w_short_bow',
     bio: '水都蒼瀾的軍師，出身守護水晶的「水守」一族。凡事以大局為先，卻很不擅長說出真心話。',
   },
-};
+});
 export const HERO_ORDER = ['aren', 'sylvie', 'mira', 'talo', 'rena', 'neo'];
 
 // ---------------------------------------------------------------- echoes

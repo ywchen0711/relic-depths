@@ -426,9 +426,9 @@ class Game {
     // new game: pick a class
     this.S = newState(); this.S.pace = 2;
     await this.ui.fade(0, 300);
-    let cls = null; while (!cls) cls = await this.ui.classSelect('選擇你的職業（之後可以在營地招募其他職業）');
+    let cls = null; while (!cls) cls = await this.ui.classSelect('選擇你的職業（主角比傭兵更強；之後可以在營地招募傭兵）');
     await this.ui.fade(1, 300);
-    addHero(this.S, cls, 1); autoBuild(this.S, cls);
+    addHero(this.S, cls, 1); this.S.lead = cls; autoBuild(this.S, cls);
     this.applySettings();
     this.field.load('town', 15, 18, 'down');
     this.field.player.root.visible = true;

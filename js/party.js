@@ -1,5 +1,5 @@
 // The save state and everything derived from it: stats, skills, echoes, levels, items.
-import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, EXP_NEXT, AP_CAP, BOND_EXP, STAR_COST, SUMMONS, ECHO_ORDER } from './data.js?v=1';
+import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, EXP_NEXT, AP_CAP, BOND_EXP, STAR_COST, SUMMONS, ECHO_ORDER, clsOf } from './data.js?v=1';
 import { APT, WTYPES, ARTS_BY_TYPE, MASTERY_AT, MASTERY_OLD, mergeFx } from './content.js?v=1';
 import { setBonusFx, register } from './loot.js?v=1';
 import { CLASSES, TREES, SKILL_INFO, SKILL_MAX, SYNERGY } from './classes.js?v=1';
@@ -16,16 +16,47 @@ export function newState() {
     settings: { quality: 1, music: 0.6, sfx: 0.8, speed: 1 },
   };
 }
-export function addHero(S, id, lv) {
+export function addHero(S, id, lv, who) {
   const C = CLASSES[id];
   if (!S.heroes[id]) {
     lv = lv || 1;
     // a class starts with its weapon and plain clothes; hired heroes come with their points still to spend
     const kit = { R: register(S, { b: `g_${C.wpn}1`, r: 0, il: 1, a: [] }), body: register(S, { b: `g_body_${C.styles[0]}1`, r: 0, il: 1, a: [] }) };
-    S.heroes[id] = { lv, exp: 0, hp: 1, mp: 1, equip: kit, echo: null, learned: [], on: [], spells: [], ap: {}, mastery: {}, grow: {}, pts: {}, sp: lv, stp: (lv - 1) * 5, stats: { str: 0, dex: 0, vit: 0, ene: 0 } };
+    S.heroes[id] = { ...(who || {}), lv, exp: 0, hp: 1, mp: 1, equip: kit, echo: null, learned: [], on: [], spells: [], ap: {}, mastery: {}, grow: {}, pts: {}, sp: lv, stp: (lv - 1) * 5, stats: { str: 0, dex: 0, vit: 0, ene: 0 } };
+    registerMerc(S, id);
     const st = heroStats(S, id); S.heroes[id].hp = st.hp; S.heroes[id].mp = st.mp;
   }
   if (!S.party.includes(id) && !S.reserve.includes(id)) { if (S.party.length < 4) S.party.push(id); else S.reserve.push(id); }
+}
+// ---------------------------------------------------------------- the hero and the hired
+// the hero you started with carries the story's strength: +1 to all skills, sturdier and stronger, luckier,
+// and more points every level. Hired heroes start at level 1, have their own names and faces, and can share a class.
+export const LEAD_FX = { skillAll: 1, hpP: 0.2, atkP: 0.15, magP: 0.15, defP: 0.1, sprP: 0.1, mf: 0.15 };
+export const LEAD_TEXT = '所有技能 +1、HP +20%、攻擊與魔力 +15%、防禦與精神 +10%、尋寶率 +15%；每升一級多 2 個屬性點，每 10 級多 1 個技能點';
+const MERC_NAMES = ['雷恩', '艾爾', '卡洛', '莉娜', '索拉', '維克', '諾娃', '塔洛', '米雅', '加隆', '菲歐', '薩夏', '巴德', '奧莉', '凱爾', '妮可', '洛克', '茵菲', '達恩', '希兒', '布蘭', '賽琳', '尤金', '瑪菈', '傑德', '莎拉', '克洛', '蘿絲', '雷歐', '伊芙'];
+const MERC_HAIR = ['#3a2a20', '#8a4a2a', '#e8c45a', '#c8c8c8', '#2a2a3a', '#a83a2a', '#5a3a6a', '#e8e0d0', '#4a6a8a', '#c86a3a'];
+const MERC_SKIN = ['light', 'tan', 'pale', 'light'];
+export const MAX_HEROES = 12;
+export const isLead = (S, id) => S.lead === id;
+// a hired hero's own entry: the class's stats with their name and look
+export function registerMerc(S, id) {
+  const h = S.heroes[id], B = HEROES[clsOf(id)]; if (!h || !B || !id.includes('#')) return;
+  HEROES[id] = { ...B, name: h.name, title: `傭兵・${B.name}`, look: { ...B.look, hair: h.hair || B.look.hair, skin: h.skin || B.look.skin, beard: B.look.beard ? h.hair || B.look.beard : undefined } };
+}
+export function hireHero(S, cls) {
+  S.mercN = (S.mercN || 1) + 1;
+  const id = `${cls}#${S.mercN}`, used = new Set(Object.values(S.heroes).map(h => h.name).filter(Boolean));
+  const free = MERC_NAMES.filter(n => !used.has(n)), r = (a) => a[Math.floor(Math.random() * a.length)];
+  addHero(S, id, 1, { name: r(free.length ? free : MERC_NAMES), hair: r(MERC_HAIR), skin: r(MERC_SKIN) });
+  return id;
+}
+// send a hired hero away: what they wore goes back to the bag, their summons leave with them
+export function dismissHero(S, id) {
+  const h = S.heroes[id]; if (!h || isLead(S, id)) return false;
+  for (const g of Object.values(h.equip)) if (g) addItem(S, g, 1);
+  delete S.heroes[id]; S.party = S.party.filter(x => x !== id); S.reserve = S.reserve.filter(x => x !== id);
+  S.minions = (S.minions || []).filter(m => m.owner !== id); delete HEROES[id];
+  return true;
 }
 export function addEcho(S, id) {
   if (!S.echoes[id]) S.echoes[id] = { bond: 1, bexp: 0, star: 0 };
@@ -69,8 +100,9 @@ export function gearFx(S, id, statsOnly) {
   for (const slot of EQUIP_SLOTS) { const g = GEAR[h.equip[slot]]; if (!g?.fx) continue; const f = { ...g.fx }; if ((slot === 'R' || slot === 'L') && g.type !== 'shield') { delete f.el; delete f.onHit; } fx = mergeFx(fx, f); }
   for (const f of setBonusFx(EQUIP_SLOTS.map(sl => h.equip[sl]).filter(Boolean)).fx) fx = mergeFx(fx, f);
   // passive skills from the skill trees (their level counts the +skills on gear too)
-  const bonus = (fx.skillAll || 0) + (fx.skillCls?.[id] || 0);
-  for (const [sid, n] of Object.entries(h.pts || {})) { const I = SKILL_INFO[sid]; if (I?.passive && n > 0) fx = mergeFx(fx, I.fxAt(Math.min(SKILL_MAX + 10, n + bonus + (fx.skillTree?.[`${id}_${I.tree}`] || 0)))); }
+  if (isLead(S, id)) fx = mergeFx(fx, LEAD_FX);
+  const bonus = (fx.skillAll || 0) + (fx.skillCls?.[clsOf(id)] || 0);
+  for (const [sid, n] of Object.entries(h.pts || {})) { const I = SKILL_INFO[sid]; if (I?.passive && n > 0) fx = mergeFx(fx, I.fxAt(Math.min(SKILL_MAX + 10, n + bonus + (fx.skillTree?.[`${clsOf(id)}_${I.tree}`] || 0)))); }
   if (!statsOnly && S.meal?.n > 0) fx = mergeFx(fx, Object.fromEntries(Object.entries(S.meal.fx).filter(([k]) => !['start', 'limit'].includes(k))));
   // resistances: percent points add up (capped at 75%), less the penalty of the harder difficulties
   const pen = [0, 30, 60][S.diff || 0], res = fx.res || {};
@@ -109,6 +141,8 @@ export function gainAP(S, amount) {
 }
 // old saves had one weapon, one armor and one accessory
 export function migrate(S) {
+  if (!S.lead) S.lead = Object.keys(S.heroes)[0]; // the first hero of the save is the one the story follows
+  for (const id in S.heroes) registerMerc(S, id);
   for (const id in S.heroes) {
     const h = S.heroes[id], e = h.equip;
     if ('w' in e || 'a' in e || 'x' in e) h.equip = { R: e.w || null, body: e.a || null, acc1: e.x || null, ...(START_KIT[id]?.L ? { L: START_KIT[id].L } : {}) };
@@ -131,11 +165,11 @@ export function skillsOf(S, id) {
 function gearOnlyFx(S, id) { const h = S.heroes[id]; let fx = {}; for (const slot of EQUIP_SLOTS) { const g = GEAR[h.equip[slot]]; if (g?.fx) fx = mergeFx(fx, g.fx); } for (const f of setBonusFx(EQUIP_SLOTS.map(sl => h.equip[sl]).filter(Boolean)).fx) fx = mergeFx(fx, f); return fx; }
 // synergy: every point in the tree's other skills makes this one stronger (percent, up to +100%)
 export function synergyOf(S, id, sid) { const I = SKILL_INFO[sid], h = S.heroes[id]; let n = 0; for (const o of TREES[id][I.tree].skills) if (o !== sid) n += h.pts?.[o] || 0; return Math.min(60, Math.round(n * SYNERGY * 100)); }
-export function skillBonus(S, id) { const fx = gearOnlyFx(S, id); return (fx.skillAll || 0) + (fx.skillCls?.[id] || 0); }
-export function skillLv(S, id, sid) { const n = S.heroes[id].pts?.[sid] || 0; if (n <= 0) return 0; const t = gearOnlyFx(S, id).skillTree?.[`${id}_${SKILL_INFO[sid].tree}`] || 0; return Math.min(SKILL_MAX + 10, n + skillBonus(S, id) + t); }
+export function skillBonus(S, id) { const fx = gearOnlyFx(S, id); return (fx.skillAll || 0) + (fx.skillCls?.[clsOf(id)] || 0) + (isLead(S, id) ? LEAD_FX.skillAll : 0); }
+export function skillLv(S, id, sid) { const n = S.heroes[id].pts?.[sid] || 0; if (n <= 0) return 0; const t = gearOnlyFx(S, id).skillTree?.[`${clsOf(id)}_${SKILL_INFO[sid].tree}`] || 0; return Math.min(SKILL_MAX + 10, n + skillBonus(S, id) + t); }
 // can a point go into this skill now? ('' means yes)
 export function canLearn(S, id, sid) {
-  const h = S.heroes[id], I = SKILL_INFO[sid]; if (!I || I.cls !== id) return '不是這個職業的技能';
+  const h = S.heroes[id], I = SKILL_INFO[sid]; if (!I || I.cls !== clsOf(id)) return '不是這個職業的技能';
   if ((h.pts?.[sid] || 0) >= SKILL_MAX) return '已經是最高等級';
   if (h.lv < I.req) return `需要等級 ${I.req}`;
   const miss = (I.pre || []).filter(p => !(h.pts?.[p] > 0)); if (miss.length) return `需要先學會「${miss.map(p => SKILLS[p].name).join('、')}」`;
@@ -187,15 +221,18 @@ export function starUp(S, eid) {
 export function gainExp(S, amount) {
   const ups = [];
   for (const id of [...S.party, ...S.reserve]) {
-    const h = S.heroes[id]; const share = S.party.includes(id) ? amount : Math.floor(amount * 0.5);
+    // hired heroes far below the hero learn twice as fast until they catch up
+    const h = S.heroes[id], leadLv = S.heroes[S.lead]?.lv || h.lv, catchUp = !isLead(S, id) && h.lv < leadLv - 3 ? 2 : 1;
+    const share = Math.floor((S.party.includes(id) ? amount : amount * 0.5) * catchUp);
     if (S.party.includes(id) && h.hp <= 0) continue;
     h.exp += share;
     while (h.lv < 99 && h.exp >= EXP_NEXT(h.lv)) {
       h.exp -= EXP_NEXT(h.lv);
       const before = heroStats(S, id); h.lv++; const after = heroStats(S, id);
       h.hp += after.hp - before.hp; h.mp += after.mp - before.mp;
-      h.sp = (h.sp || 0) + 1; h.stp = (h.stp || 0) + 5;
-      ups.push([id, h.lv, ['技能點數 +1', '屬性點數 +5']]);
+      const lead = isLead(S, id), sp = 1 + (lead && h.lv % 10 === 0 ? 1 : 0), stp = lead ? 7 : 5;
+      h.sp = (h.sp || 0) + sp; h.stp = (h.stp || 0) + stp;
+      ups.push([id, h.lv, [`技能點數 +${sp}`, `屬性點數 +${stp}`]]);
     }
   }
   return ups;

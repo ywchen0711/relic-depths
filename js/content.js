@@ -1,6 +1,6 @@
 // Generated content: weapon types with their own battle rules, 1000+ pieces of equipment with effects,
 // 400 spells, 500 items and the weapon arts. Everything is built from tables so it stays consistent.
-import { ELEM, WPN, ICON, ELEM_COLOR, SKILLS, ITEMS, GEAR, ENEMIES, setGearResolver } from './data.js?v=1';
+import { ELEM, WPN, ICON, ELEM_COLOR, SKILLS, ITEMS, GEAR, ENEMIES, setGearResolver, alias } from './data.js?v=1';
 import { BESTIARY_NEW } from './monsters.js?v=1';
 import { H_TRAITS } from './horde.js?v=1';
 import { applyDepth } from './depth.js?v=1';
@@ -44,14 +44,14 @@ for (const [k, t] of Object.entries(WTYPES)) { WPN[k] = t.n; ICON[k] = ICON[k] |
 WPN.shield = '盾'; ICON.shield = '🛡️';
 
 // which weapons and armor styles each hero can use
-export const APT = {
+export const APT = alias({
   aren: { w: ['sword', 'greatsword', 'katana', 'axe', 'spear'], shield: true, styles: ['heavy', 'light'] },
   sylvie: { w: ['spear', 'sword', 'hammer', 'whip'], shield: true, styles: ['heavy', 'light'] },
   mira: { w: ['staff', 'rod', 'hammer', 'harp', 'tome'], shield: true, styles: ['light', 'robe'] },
   talo: { w: ['rod', 'staff', 'tome', 'dagger', 'boomerang'], shield: false, styles: ['light', 'robe'] },
   rena: { w: ['axe', 'hammer', 'gun', 'knuckle', 'boomerang', 'dagger'], shield: true, styles: ['heavy', 'light'] },
   neo: { w: ['bow', 'gun', 'dagger', 'whip', 'boomerang', 'harp', 'sword'], shield: false, styles: ['light', 'robe'] },
-};
+});
 
 // ================================================================ tiers and materials
 const T_ATK = [8, 15, 26, 38, 52, 66, 80, 96];
