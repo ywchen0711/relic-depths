@@ -144,7 +144,7 @@ P.merchantMenu = async function () {
   const S = this.S, lv = Math.max(...Object.values(S.heroes).map(h => h.lv));
   if (!S.shop || S.shopLv !== lv || !S.shop.every(g => GEAR[g])) { for (const g of S.shop || []) if (!S.items[g] && !S.stash?.includes(g)) dropLoot(S, g); S.shop = shopStock(S, lv + 2); S.shopLv = lv; }
   for (;;) {
-    const i = await this.choose(['買裝備', '買道具', '賣裝備', '賣掉所有普通與魔法裝備'], { title: `商人　<span class="gil">${S.gil} G</span>`, cls: 'small' });
+    const i = await this.choose(['買裝備', '買道具', { label: '賣裝備', sub: '過濾、勾選後一起賣' }, '賣掉所有普通與魔法裝備'], { title: `商人　<span class="gil">${S.gil} G</span>`, cls: 'small' });
     if (i < 0) return;
     if (i === 0) {
       let st = 0;
@@ -154,7 +154,7 @@ P.merchantMenu = async function () {
         S.gil -= GEAR[g].price; addItem(S, g, 1); S.shop = S.shop.filter(x => x !== g); this.G.audio.sfx('item'); }
     }
     if (i === 1) await this.shop(CONSUMABLES.filter(x => ITEMS[x]), '道具');
-    if (i === 2) await this.bagMenu({ sell: true });
+    if (i === 2) await this.sellMenu();
     if (i === 3) {
       const junk = this.gearOwned().filter(g => (GEAR[g].rarity ?? 0) <= 1 && !Object.values(S.heroes).some(h => Object.values(h.equip).includes(g)));
       if (!junk.length) { this.toast('沒有可以賣的普通或魔法裝備'); continue; }
@@ -162,6 +162,74 @@ P.merchantMenu = async function () {
       if (await this.yesno(`賣掉 ${junk.length} 件普通與魔法裝備，共 ${total} G？`)) { for (const g of junk) { const n = S.items[g]; for (let j = 0; j < n; j++) this.removeGear(g); } S.gil += total; this.G.audio.sfx('item'); }
     }
   }
+};
+
+// ---------------------------------------------------------------- selling: filter the bag, tick what should go, sell it all at once
+const SELL_RAR = [['全部', null], ['普通', 0], ['魔法', 1], ['稀有', 2], ['套裝', 4], ['暗金', 3]];
+const SELL_CAT = [['全部', null], ['武器', 'W'], ['防具', 'A'], ['盾', 'S'], ['飾品', 'J']];
+const catOf = (G) => G.slot === 'acc' ? 'J' : G.slot === 'hand' ? (G.type === 'shield' ? 'S' : 'W') : 'A';
+P.sellMenu = function () {
+  const S = this.S, G = this.G, ui = this;
+  const f = this.sellFilter = this.sellFilter || { rar: 0, cat: 0, useless: false };
+  const picked = new Set(); let sel = 0, list = [];
+  return new Promise((res) => {
+    const wrap = document.createElement('div'); wrap.className = 'chooser wide sellwin'; this.layer.appendChild(wrap);
+    const nobody = (g) => !Object.keys(S.heroes).some(id => canEquip(id, g, S));
+    const refresh = () => {
+      const r = SELL_RAR[f.rar][1], c = SELL_CAT[f.cat][1];
+      list = this.gearOwned().filter(g => (r == null || (GEAR[g].rarity ?? 0) === r) && (c == null || catOf(GEAR[g]) === c) && (!f.useless || nobody(g)));
+      for (const g of [...picked]) if (!S.items[g]) picked.delete(g);
+      sel = Math.max(0, Math.min(sel, list.length - 1));
+    };
+    const total = () => [...picked].reduce((s, g) => s + sellPrice(GEAR[g]) * (S.items[g] || 0), 0);
+    const chips = (arr, cur, key) => arr.map(([n], i) => `<span class="sl-chip${i === cur ? ' on' : ''}" data-${key}="${i}">${n}</span>`).join('');
+    const build = () => {
+      refresh();
+      const all = list.length && list.every(g => picked.has(g));
+      wrap.innerHTML = `<div class="ch-box noanim"><div class="ch-title">賣裝備　<span class="gil">${S.gil} G</span></div>
+        <div class="sl-bar"><span class="sl-lab">稀有度</span>${chips(SELL_RAR, f.rar, 'r')}</div>
+        <div class="sl-bar"><span class="sl-lab">種類</span>${chips(SELL_CAT, f.cat, 'c')}<span class="sl-chip${f.useless ? ' on' : ''}" data-u="1">只看沒人能用的</span></div>
+        <div class="ch-cols"><div class="ch-list">${list.length ? list.map((g, i) => `<div class="ch-it${i === sel ? ' sel' : ''}" data-i="${i}"><span class="sl-box${picked.has(g) ? ' on' : ''}">${picked.has(g) ? '✔' : ''}</span><span class="ch-l">${col(GEAR[g])}${S.items[g] > 1 ? ` ×${S.items[g]}` : ''}</span><span class="ch-s">${sellPrice(GEAR[g])} G</span></div>`).join('') : '<div class="dim" style="padding:12px">沒有符合的裝備</div>'}</div>
+        <div class="ch-info">${list[sel] ? this.gearHTML(list[sel]) + `<div style="color:#ffe04a">賣價 ${sellPrice(GEAR[list[sel]])} G</div>` + this.whoCanWear(list[sel]) : ''}</div></div>
+        <div class="sl-foot"><span class="sl-btn" data-a="all">${all ? '取消全選' : '全選目前列出的'}</span><span class="sl-btn" data-a="none">清除勾選</span><span class="sl-sum">已選 ${picked.size} 件　共 <b>${total()} G</b></span><span class="sl-btn go${picked.size ? '' : ' dis'}" data-a="sell">賣出</span><span class="sl-btn" data-a="back">離開</span></div>
+        <div class="sl-help">↑↓ 移動　Z 勾選　←→ 換稀有度　M 全選　C 賣出　X 離開</div></div>`;
+      wrap.querySelectorAll('[data-r]').forEach(e => e.onclick = () => { f.rar = +e.dataset.r; sel = 0; G.audio.sfx('move'); build(); });
+      wrap.querySelectorAll('[data-c]').forEach(e => e.onclick = () => { f.cat = +e.dataset.c; sel = 0; G.audio.sfx('move'); build(); });
+      wrap.querySelector('[data-u]').onclick = () => { f.useless = !f.useless; sel = 0; G.audio.sfx('move'); build(); };
+      wrap.querySelectorAll('.ch-it').forEach(e => e.onclick = () => { const i = +e.dataset.i; sel = i; toggle(); });
+      wrap.querySelectorAll('[data-a]').forEach(e => e.onclick = () => act(e.dataset.a));
+      wrap.querySelector('.ch-it.sel')?.scrollIntoView({ block: 'nearest' });
+    };
+    const toggle = () => { const g = list[sel]; if (!g) return; if (picked.has(g)) picked.delete(g); else picked.add(g); G.audio.sfx('move'); build(); };
+    let busy = false;
+    const act = async (a) => {
+      if (busy) return;
+      if (a === 'all') { const all = list.length && list.every(g => picked.has(g)); for (const g of list) all ? picked.delete(g) : picked.add(g); G.audio.sfx('move'); build(); }
+      if (a === 'none') { picked.clear(); G.audio.sfx('move'); build(); }
+      if (a === 'back') { off(); wrap.remove(); G.audio.sfx('cancel'); res(); }
+      if (a === 'sell') {
+        if (!picked.size) { G.audio.sfx('error'); return; }
+        const gs = [...picked], sum = total(), good = gs.filter(g => (GEAR[g].rarity ?? 0) >= 2).length;
+        busy = true; wrap.style.visibility = 'hidden';
+        const ok = await ui.yesno(`賣掉 ${gs.length} 件裝備，共 ${sum} G？${good ? `\n（其中 ${good} 件是稀有、套裝或暗金）` : ''}`);
+        wrap.style.visibility = ''; busy = false;
+        if (!ok) return;
+        for (const g of gs) { const n = S.items[g] || 0; for (let j = 0; j < n; j++) ui.removeGear(g); }
+        S.gil += sum; picked.clear(); G.audio.sfx('item'); ui.toast(`賣出 ${gs.length} 件，得到 ${sum} G`); build();
+      }
+    };
+    const off = G.input.on((k) => {
+      if (busy) return;
+      if (k === 'up' && list.length) { sel = (sel + list.length - 1) % list.length; G.audio.sfx('move'); build(); }
+      if (k === 'down' && list.length) { sel = (sel + 1) % list.length; G.audio.sfx('move'); build(); }
+      if (k === 'left' || k === 'right') { f.rar = (f.rar + (k === 'left' ? SELL_RAR.length - 1 : 1)) % SELL_RAR.length; sel = 0; G.audio.sfx('move'); build(); }
+      if (k === 'ok') toggle();
+      if (k === 'map') act('all');
+      if (k === 'menu') act('sell');
+      if (k === 'cancel') act('back');
+    });
+    build();
+  });
 };
 
 // ---------------------------------------------------------------- the gambler
