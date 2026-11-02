@@ -20,6 +20,7 @@ export const LIGHTS = {
   deep: { sun: ['#6ac8ff', 0.35, [0.2, 1, 0.4]], hemi: ['#2a6a8a', '#0a1a2a', 0.55], exp: 1.15 },
   sky: { sun: ['#fff8f0', 2.8, [0.4, 1, 0.6]], hemi: ['#d0dcff', '#d8c8e8', 1.1], exp: 1.0 },
   void: { sun: ['#c8a0ff', 0.9, [0.3, 1, 0.5]], hemi: ['#5a3a7a', '#1a0a2a', 0.6], exp: 1.1 },
+  hell: { sun: ['#ff8a5a', 0.8, [0.3, 1, 0.5]], hemi: ['#a84a2a', '#2a0a06', 0.6], exp: 1.12 },
 };
 
 const sheetCache = new Map();
@@ -83,7 +84,7 @@ export class Field {
     this.built = buildMap(this.scene, this.map, theme);
     // sky
     this.sky = skyDome(theme.sky[0], theme.sky[1]); this.scene.add(this.sky);
-    this.scene.fog = theme.fog ? new THREE.Fog(theme.fog[0], theme.fog[1] * FAR_VIEW, theme.fog[2] * FAR_VIEW) : null; // the camera sits further back, so the fog does too
+    this.scene.fog = theme.fog ? new THREE.Fog(theme.fog[0], Math.max(24, theme.fog[1] * FAR_VIEW), Math.max(72, theme.fog[2] * FAR_VIEW)) : null; // the camera sits further back, so the fog does too
     if (theme.clouds) {
       const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
       g.fillStyle = '#e8e0f8'; g.fillRect(0, 0, 256, 256);
@@ -108,7 +109,7 @@ export class Field {
       if (o.k === 'mogu' && this.G.moguActive && this.G.moguActive(o.id)) this.addMogu(o);
     }
     // open chests already looted
-    for (const it of this.built.interact) if (it.kind === 'chest' && this.G.S.chests.includes(it.id)) { it.open = true; it.lidP.rotation.x = -1.9; }
+    for (const it of this.built.interact) if (it.kind === 'chest' && this.G.S.chests.includes(it.id)) { it.open = true; if (it.anim) it.anim(1); else it.lidP.rotation.x = -1.9; }
     // hide things gated by flags
     for (const p of this.built.props) if (p.id === 'airship' && this.def.objs?.some(o => o.k === 'airship' && o.cond && !this.G.cond(o.cond))) p.mesh.visible = false;
     // player

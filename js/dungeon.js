@@ -1,14 +1,14 @@
 // The camp and the dungeons. Five acts of four levels; every time you walk into a level it is laid out afresh:
 // a winding way from the entrance to the exit, rooms along it, side passages with chests, and a waypoint crystal on
 // the first and third level. The fourth level of each act ends in the act boss's lair.
-import { MAPS, G } from './maps.js?v=1';
+import { MAPS, G, THEMES } from './maps.js?v=1';
 import { ENEMIES, SKILLS } from './data.js?v=1';
 import { BESTIARY_NEW } from './content.js?v=1';
 
 export const DIFFS = [{ n: '普通', add: 0, c: '#e8e8e8' }, { n: '噩夢', add: 36, c: '#ff8a4a' }, { n: '地獄', add: 62, c: '#ff3a3a' }];
 export const ACTS = [
   { n: '第一幕　腐朽荒野', lv: 1, levels: [['荒野', 'forest', 'forest'], ['黑暗森林', 'forest', 'forest'], ['地下墓穴', 'mine', 'cave'], ['墓穴深處', 'mine', 'cave']], boss: 'rottree', bossN: '腐朽古樹' },
-  { n: '第二幕　焦土峽谷', lv: 11, levels: [['焦土', 'mountain', 'mountain'], ['乾涸河谷', 'mountain', 'mountain'], ['失落海岸', 'coast', 'coast'], ['海蝕洞', 'coast', 'coast']], boss: 'irongolem', bossN: '鋼鐵巨像' },
+  { n: '第二幕　焦土峽谷', lv: 11, levels: [['焦土沙漠', 'mountain', 'mountain'], ['乾涸河谷', 'mountain', 'mountain'], ['失落海岸', 'coast', 'coast'], ['海蝕洞', 'coast', 'coast']], boss: 'irongolem', bossN: '鋼鐵巨像' },
   { n: '第三幕　沉沒神殿', lv: 21, levels: [['神殿外庭', 'temple', 'temple'], ['淹沒迴廊', 'temple', 'temple'], ['祭司之間', 'temple', 'temple'], ['深淵祭壇', 'temple', 'temple']], boss: 'leviath', bossN: '深海巨獸' },
   { n: '第四幕　天空廢墟', lv: 31, levels: [['浮空階梯', 'sky', 'sky'], ['雲之庭', 'sky', 'sky'], ['風之塔', 'sky', 'sky'], ['天頂', 'sky', 'sky']], boss: 'elderdragon', bossN: '古龍' },
   { n: '第五幕　深淵', lv: 41, levels: [['裂隙', 'skyDark', 'void'], ['虛無之海', 'skyDark', 'void'], ['魔王城門', 'skyDark', 'void'], ['深淵王座', 'skyDark', 'void']], boss: 'abyss', bossN: '深淵之王' },
@@ -48,10 +48,58 @@ export function areaLevel(S, act, lvl) { return Math.min(99, ACTS[act].lv + lvl 
   };
 }
 
+// ---------------------------------------------------------------- how each level looks
+// its ground, what lies about, and what its treasure is kept in (box: the big finds; minor: the small things to search)
+Object.assign(THEMES, {
+  wilds: { ...THEMES.forest, tiles: { main: ['grass', '#7a8a48'], second: ['dirt', '#8a7454'], third: ['dirt', '#6a5a44'], grass: ['grass', '#6a7a40'] }, wall: ['stonewall', '#7a7464'], cap: ['grass', '#5a6a38'], sky: ['#6a7a8a', '#d8c8a8'], light: 'dusk', fireflies: false, motes: '#f0e0b0', bgm: 'world', fog: ['#b8a890', 30, 90] },
+  crypt: { ...THEMES.mine, light: 'interior', tiles: { main: ['cobble', '#7a7068'], second: ['brick', '#6a5a50'], third: ['cobble', '#5a5250'] }, wall: ['brick', '#5a4a44'], cap: ['cobble', '#3a3430'], motes: '#d8c8a8', fog: ['#140e0c', 16, 52], pillar: ['stonewall', '#7a7068'] },
+  crypt2: { ...THEMES.mine, light: 'sanctum', tiles: { main: ['cobble', '#5e5868'], second: ['brick', '#4a3e4a'], third: ['cobble', '#3e3a46'] }, wall: ['brick', '#3e3440'], cap: ['cobble', '#2a2430'], motes: '#b08aff', fog: ['#0e0a14', 14, 46], pillar: ['stonewall', '#5e5868'] },
+  desert: { ...THEMES.mountain, tiles: { main: ['sand', '#e4c488'], second: ['sand', '#d0aa70'], third: ['dirt', '#b08a5a'] }, wall: ['stonewall', '#c8a070'], cap: ['sand', '#d8b478'], sky: ['#e8a860', '#f8e8c0'], motes: '#fff0c0', fog: ['#f0d8a8', 34, 100] },
+  badlands: { ...THEMES.mountain, tiles: { main: ['dirt', '#b07a4a'], second: ['dirt', '#9a6440'], third: ['sand', '#c89a68'] }, wall: ['stonewall', '#a06a48'], cap: ['dirt', '#8a5a3a'], sky: ['#d87a4a', '#f4d0a0'], light: 'dusk', fog: ['#e0a070', 30, 90] },
+  seacave: { ...THEMES.mine, tiles: { main: ['cave', '#4a6a70'], second: ['sand', '#a8a080'], third: ['cave', '#36505a'] }, wall: ['cave', '#2e4850'], cap: ['cave', '#24383e'], light: 'deep', motes: '#8ae8ff', bgm: 'seaside', fog: ['#081a20', 16, 52], pillar: ['cave', '#3a5a60'] },
+  templeYard: { ...THEMES.temple, tiles: { ...THEMES.temple.tiles, second: ['grass', '#3e6a5a'] } },
+  templeHall: { ...THEMES.temple, tiles: { ...THEMES.temple.tiles, second: ['carpet', '#2a4a7a'] }, motes: '#ffe8a0' },
+  templeDeep: { ...THEMES.temple, tiles: { main: ['temple', '#4a5a78'], second: ['crystal', '#5a3a8a'], third: ['cave', '#1a1a30'] }, wall: ['temple', '#3a4060'], cap: ['temple', '#2a3050'], motes: '#c88aff', fog: ['#08061a', 12, 40] },
+  skyGold: { ...THEMES.sky, tiles: { ...THEMES.sky.tiles, main: ['temple', '#f4ecd0'], second: ['crystal', '#ffd88a'] }, sky: ['#e8a040', '#fff0d0'], motes: '#ffe8a0' },
+  hell: { ...THEMES.skyDark, tiles: { main: ['cave', '#5a2a24'], second: ['cave', '#7a3020'], third: ['dirt', '#3a1a14'] }, wall: ['cave', '#2a1210'], cap: ['cave', '#1e0c0a'], wallH: 3, sky: ['#1a0404', '#5a1408'], light: 'hell', motes: '#ff8a4a', fog: ['#200806', 16, 52], clouds: false, edgeDrop: -1, pillar: ['cave', '#3a1a14'] },
+  castle: { ...THEMES.skyDark, tiles: { main: ['brick', '#4a3a40'], second: ['carpet', '#5a1a1a'], third: ['cobble', '#3a3034'] }, wall: ['brick', '#2e2428'], cap: ['stonewall', '#2a2026'], wallH: 3.2, sky: ['#0a0408', '#2a0a14'], motes: '#ff6a6a', fog: ['#14080c', 14, 46], clouds: false, edgeDrop: -1, pillar: ['brick', '#3a2a30'] },
+});
+export const BOX = {
+  chest: { n: '寶箱' }, wet: { n: '漂流寶箱', color: '#6a5a4a' },
+  iron: { n: '惡魔的寶箱', color: '#3a3038', mat: 'metal', trim: '#c84a3a' }, relic: { n: '聖物匣', color: '#e8d8a8', mat: 'temple', trim: '#e8c050' }, sky: { n: '天空寶匣', color: '#e8e4f4', mat: 'temple', trim: '#8ae8ff' },
+  coffin: { n: '棺材', style: 'coffin' }, sarc: { n: '石棺', style: 'sarc' }, urn: { n: '陶甕', style: 'urn' }, vase: { n: '祭品甕', style: 'urn', color: '#3a7a8a', trim: '#e8c050' },
+  barrel: { n: '木桶', style: 'barrel' }, clam: { n: '巨貝', style: 'clam' }, skeleton: { n: '冒險者的骸骨', style: 'skeleton' }, stump: { n: '空心樹樁', style: 'stump' },
+  crystal: { n: '水晶簇', style: 'crystal' }, cocoon: { n: '血肉之繭', style: 'cocoon' }, bonepile: { n: '骨堆', style: 'bonepile' },
+};
+// deco: [prop, share of the floor, blocks the way, colours]
+export const LOOK = {
+  '0_0': { theme: 'wilds', bg: 'wilds', deco: [['deadtree', 0.012, 1], ['tomb', 0.005, 1], ['rock', 0.008, 1], ['bones', 0.006], ['bush', 0.01, 0, { leaf: '#6a7a3a' }], ['flowers', 0.004, 0, { color: '#c8b8e8' }]], box: ['chest', 'stump'], minor: ['stump', 'bonepile'] },
+  '0_1': { deco: [['mushroom', 0.01], ['mushroom', 0.004, 0, { cap: '#8a6ae8', glow: true }], ['deadtree', 0.004, 1], ['rock', 0.006, 1]], box: ['stump', 'chest'], minor: ['stump', 'stump', 'bonepile'] },
+  '0_2': { theme: 'crypt', bg: 'crypt', bright: 3.2, deco: [['bones', 0.01], ['skulls', 0.006], ['pillar', 0.004, 1], ['tomb', 0.003, 1]], box: ['sarc', 'coffin'], minor: ['coffin', 'urn', 'bonepile'] },
+  '0_3': { theme: 'crypt2', bg: 'crypt', bright: 3.2, deco: [['bones', 0.012], ['skulls', 0.008], ['pillar', 0.004, 1], ['spikes', 0.003, 1, { color: '#5a5048' }]], box: ['sarc'], minor: ['coffin', 'bonepile', 'urn'] },
+  '1_0': { theme: 'desert', bg: 'desert', deco: [['cactus', 0.01, 1], ['skulls', 0.005], ['bones', 0.008], ['rock', 0.006, 1, { color: '#c8a070' }], ['deadtree', 0.003, 1, { bark: '#a08a6a' }]], box: ['skeleton', 'urn'], minor: ['skeleton', 'urn'] },
+  '1_1': { theme: 'badlands', bg: 'badlands', deco: [['deadtree', 0.008, 1], ['rock', 0.01, 1, { color: '#a06a48' }], ['bones', 0.008], ['skulls', 0.004], ['cactus', 0.003, 1]], box: ['skeleton', 'chest'], minor: ['urn', 'bonepile', 'skeleton'] },
+  '1_2': { deco: [['palm', 0.006, 1], ['rock', 0.006, 1], ['reeds', 0.008], ['coral', 0.004, 0, { color: '#ff9a8a' }]], box: ['wet', 'barrel'], minor: ['barrel', 'clam'] },
+  '1_3': { theme: 'seacave', bg: 'seacave', bright: 3, deco: [['coral', 0.008], ['coral', 0.004, 0, { color: '#8ac8ff' }], ['seaweed', 0.01], ['rock', 0.006, 1, { color: '#3a5a60' }]], box: ['clam', 'wet'], minor: ['clam', 'barrel'] },
+  '2_0': { theme: 'templeYard', deco: [['pillar', 0.005, 1], ['bush', 0.008, 0, { leaf: '#3e6a5a' }], ['rock', 0.004, 1, { color: '#7a9aa8' }], ['seaweed', 0.004]], box: ['relic', 'vase'], minor: ['vase'] },
+  '2_1': { deco: [['coral', 0.006], ['seaweed', 0.01], ['pillar', 0.004, 1]], box: ['clam', 'relic'], minor: ['vase', 'clam'] },
+  '2_2': { theme: 'templeHall', deco: [['brazier', 0.004, 1], ['banner', 0.004, 1, { color: '#2a5a8a', sigil: '#8ae8ff' }], ['pillar', 0.004, 1]], box: ['relic'], minor: ['vase'] },
+  '2_3': { theme: 'templeDeep', deco: [['tentacle', 0.006, 1], ['brazier', 0.003, 1], ['skulls', 0.005], ['crystal', 0.004, 0, { color: '#c88aff' }]], box: ['relic', 'sarc'], minor: ['vase', 'cocoon'] },
+  '3_0': { deco: [['crystal', 0.006, 0, { color: '#c8a0ff' }], ['pillar', 0.004, 1], ['obelisk', 0.002, 1]], box: ['sky', 'crystal'], minor: ['crystal', 'vase'] },
+  '3_1': { deco: [['bush', 0.01, 0, { leaf: '#8ac86a', flower: '#f4a8d8' }], ['flowers', 0.008], ['crystal', 0.003, 0, { color: '#c8a0ff' }]], box: ['sky', 'crystal'], minor: ['crystal'] },
+  '3_2': { deco: [['banner', 0.005, 1, { color: '#3a5ad8', sigil: '#f4f0ff' }], ['pillar', 0.005, 1], ['obelisk', 0.002, 1]], box: ['sky'], minor: ['crystal', 'vase'] },
+  '3_3': { theme: 'skyGold', deco: [['obelisk', 0.004, 1, { rune: '#ffd88a' }], ['crystal', 0.005, 0, { color: '#ffd88a' }], ['pillar', 0.004, 1]], box: ['sky', 'crystal'], minor: ['crystal'] },
+  '4_0': { theme: 'hell', bg: 'hell', bright: 2.6, deco: [['spikes', 0.008, 1], ['skulls', 0.006], ['bones', 0.008], ['tentacle', 0.004, 1, { color: '#8a2a2a' }]], box: ['iron', 'cocoon'], minor: ['bonepile', 'cocoon'] },
+  '4_1': { deco: [['crystal', 0.006, 0, { color: '#c8a0ff' }], ['tentacle', 0.005, 1], ['spikes', 0.003, 1]], box: ['iron', 'crystal'], minor: ['cocoon', 'crystal'] },
+  '4_2': { theme: 'castle', bg: 'castle', bright: 2.8, deco: [['banner', 0.005, 1], ['brazier', 0.004, 1], ['skulls', 0.005], ['spikes', 0.003, 1], ['pillar', 0.003, 1]], box: ['iron'], minor: ['urn', 'bonepile'] },
+  '4_3': { theme: 'hell', bg: 'hell', bright: 2.6, deco: [['brazier', 0.004, 1], ['skulls', 0.008], ['spikes', 0.006, 1], ['tentacle', 0.004, 1, { color: '#8a2a2a' }]], box: ['iron'], minor: ['bonepile', 'cocoon'] },
+};
+const boxObj = (key, extra) => { const B = BOX[key] || BOX.chest; return { k: 'chest', name: B.n, style: B.style, color: B.color, mat: B.mat, trim: B.trim, ...extra }; };
+
 // ---------------------------------------------------------------- a dungeon level
 function rng(seed) { let s = (seed * 9301 + 49297) % 233280 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
 export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9)) {
-  const A = ACTS[act], [name, theme, hab] = A.levels[lvl], r = rng(seed);
+  const A = ACTS[act], [name, theme0, hab] = A.levels[lvl], r = rng(seed), L = LOOK[`${act}_${lvl}`] || {}, theme = L.theme || theme0;
   const W = 40 + Math.floor(r() * 8), H = 40 + Math.floor(r() * 6), open = '#';
   const g = new G(W, H, open);
   // the main way: from the bottom to the top, zigzagging across
@@ -81,13 +129,38 @@ export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9)) {
   else { objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: 'boss', act }); objs.push({ k: 'bigcrystal', x: ex, z: ez - 1, color: '#b06aff' }); }
   if (WP_LEVELS.includes(lvl)) objs.push({ k: 'crystal', x: sx + 2, z: sz - 1 });
   // dark places get torches along the way
-  if (['mine', 'temple', 'skyDark'].includes(theme)) pts.forEach(([x, z], i) => { const tx = x + (r() < 0.5 ? -3 : 3), tz = z + (r() < 0.5 ? -1 : 1); if (m.grid[tz]?.[tx] && m.grid[tz][tx] !== '#') objs.push({ k: 'torch', x: tx, z: tz }); });
-  chests.forEach(([x, z], i) => objs.push({ k: 'chest', x, z, id: `${id}_${seed}_${i}`, loot: areaLevel(S, act, lvl), item: null }));
+  if (THEMES[theme]?.night) pts.forEach(([x, z], i) => { const tx = x + (r() < 0.5 ? -3 : 3), tz = z + (r() < 0.5 ? -1 : 1); if (m.grid[tz]?.[tx] && m.grid[tz][tx] !== '#') objs.push({ k: 'torch', x: tx, z: tz }); });
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  chests.forEach(([x, z], i) => objs.push(boxObj(pick(L.box || ['chest']), { x, z, id: `${id}_${seed}_${i}`, loot: areaLevel(S, act, lvl), item: null, big: true })));
   // a shrine (a buff) on some levels
   if (r() < 0.5) { const [x, z] = pts[1 + Math.floor(r() * (n - 2))]; objs.push({ k: 'statue', x: x + 2, z, id: `shrine_${seed}`, weapon: 'staff', hair: 'long', shrine: ['exp', 'atk', 'def', 'mf'][Math.floor(r() * 4)] }); }
   const lv = areaLevel(S, act, lvl);
+  // what lies about, and the small things to search: never on top of something else, and never walling off a passage
+  // (anything solid goes only where all eight neighbours are open floor, and keeps its distance from other solid things)
+  const FLOOR = '.,:', taken = new Set(), solid = [];
+  const floorAt = (x, z) => FLOOR.includes(m.grid[z]?.[x] ?? '#');
+  const near = (x, z, d) => solid.some(([a, b]) => Math.abs(a - x) <= d && Math.abs(b - z) <= d);
+  for (const o of objs) for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= (o.w || 1) + 1; dx++) taken.add(`${o.x + dx},${o.z + dz}`);
+  for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { taken.add(`${sx + dx},${sz + dz}`); taken.add(`${ex + dx},${ez + dz}`); }
+  const open8 = (x, z) => { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (!floorAt(x + dx, z + dz)) return false; return true; };
+  const place = (x, z, block) => { if (!floorAt(x, z) || taken.has(`${x},${z}`)) return false; if (block && (!open8(x, z) || near(x, z, 2))) return false; taken.add(`${x},${z}`); if (block) solid.push([x, z]); return true; };
+  const nMinor = 3 + Math.floor(r() * 4);
+  for (let i = 0, tries = 0; i < nMinor && tries < 200; tries++) {
+    const [px, pz] = pick(pts), x = Math.round(px + (r() - 0.5) * 9), z = Math.round(pz + (r() - 0.5) * 7);
+    if (place(x, z, true)) { objs.push(boxObj(pick(L.minor || ['urn']), { x, z, id: `${id}_${seed}_m${i}`, loot: lv, minor: true })); i++; }
+  }
+  for (const [kind, share, block, colors] of L.deco || []) {
+    const want = Math.round(W * H * share);
+    for (let i = 0, tries = 0; i < want && tries < want * 12; tries++) {
+      const x = 1 + Math.floor(r() * (W - 2)), z = 1 + Math.floor(r() * (H - 2));
+      if (!place(x, z, !!block)) continue; i++;
+      if (kind === 'pillar') objs.push({ k: 'pillar', x, z, broken: r() < 0.6, h: 2.6 + r() });
+      else if (kind === 'brazier') objs.push({ k: 'brazier', x, z });
+      else objs.push({ k: 'deco', x, z, sprite: kind, colors, block: !!block, scale: block ? 1.1 + r() * 0.35 : 0.9 + r() * 0.3 });
+    }
+  }
   MAPS[id] = {
-    name: `${name}　Lv${lv}`, theme, ...m, objs, seed, act, lvl, hab, alv: lv, bright: { mine: 3, temple: 2.0, skyDark: 1.8 }[theme], ...(theme === 'mine' ? { fog: ['#16121c', 20, 58] } : {}),
+    name: `${name}　Lv${lv}`, theme, ...m, objs, seed, act, lvl, hab, bg: L.bg, alv: lv, bright: L.bright ?? { mine: 3, temple: 2.0, templeYard: 2.0, templeHall: 2.0, templeDeep: 2.0, skyDark: 1.8 }[theme],
     enc: { troops: [['slime']], lv }, encRate: 22,
     spawn: [sx, sz, 'up'], exitSpawn: [ex, ez + 1, 'down'],
   };

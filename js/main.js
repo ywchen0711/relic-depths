@@ -195,14 +195,24 @@ class Game {
         n.talking = false; if (!d.wander) { n.dir = prevDir; n.ang = null; f.syncWalker(n); }
         f.refreshBubbles();
       } else if (it.kind === 'chest') {
-        if (it.open) { await this.ui.say('', '寶箱是空的。', null); }
+        const nm = it.name || '寶箱';
+        if (it.open) { await this.ui.say('', `${nm}裡什麼也沒有了。`, null); }
         else if (it.cond && !this.cond(it.cond)) { await this.ui.say('', '寶箱打不開……', null); }
         else {
           it.open = true; this.S.chests.push(it.id); this.audio.sfx('chest');
-          let t = 0; while (t < 0.3) { t += await this.frame(); it.lidP.rotation.x = -1.9 * Math.min(1, t / 0.3); }
+          let t = 0; while (t < 0.3) { t += await this.frame(); const p = Math.min(1, t / 0.3); if (it.anim) it.anim(p); else it.lidP.rotation.x = -1.9 * p; }
           const o = MAPS[f.mapId].objs.find(o => o.id === it.id);
           const item = o?.item;
-          if (o?.loot) { const n = 1 + (Math.random() < 0.4 ? 1 : 0), got = []; const mf = Math.max(0, ...this.S.party.map(id => gearFx(this.S, id).mf || 0)); for (let i = 0; i < n; i++) { const g = rollItem(this.S, o.loot, { mf, quality: 1.6 }); addItem(this.S, g, 1); got.push(g); } const gold = Math.round(o.loot * (8 + Math.random() * 12)); this.S.gil += gold; await this.ui.say('', `找到了 ${gold} G 和：\n${got.map(g => `<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`).join('\n')}`, null); }
+          if (o?.minor) { // the small things lying about: some gold, a potion, now and then a piece of gear
+            const lv = o.loot, mf = Math.max(0, ...this.S.party.map(id => gearFx(this.S, id).mf || 0)), got = [];
+            const gold = Math.random() < 0.75 ? Math.round(lv * (2 + Math.random() * 5)) : 0; this.S.gil += gold;
+            if (Math.random() < 0.3) { const p = lv < 25 ? 'potion' : Math.random() < 0.15 ? 'xpotion' : 'hipotion'; addItem(this.S, p, 1); got.push(itemName(p)); }
+            if (Math.random() < 0.06) { addItem(this.S, 'i_tp', 1); got.push(itemName('i_tp')); }
+            if (Math.random() < 0.2) { const g = rollItem(this.S, lv, { mf }); addItem(this.S, g, 1); got.push(`<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`); }
+            if (!gold && !got.length) this.ui.toast(`${nm}裡什麼也沒有`);
+            else this.ui.toast(`${nm}：${[gold ? `${gold} G` : '', ...got].filter(Boolean).join('、')}`);
+          }
+          else if (o?.loot) { const n = 1 + (Math.random() < 0.4 ? 1 : 0), got = []; const mf = Math.max(0, ...this.S.party.map(id => gearFx(this.S, id).mf || 0)); for (let i = 0; i < n; i++) { const g = rollItem(this.S, o.loot, { mf, quality: 1.6 }); addItem(this.S, g, 1); got.push(g); } const gold = Math.round(o.loot * (8 + Math.random() * 12)); this.S.gil += gold; await this.ui.say('', `找到了 ${gold} G 和：\n${got.map(g => `<span style="color:${GEAR[g].rarColor}">${GEAR[g].name}</span>`).join('\n')}`, null); }
           if (o?.gil) { this.S.gil += o.gil; await this.ui.say('', `找到了 ${o.gil} G！`, null); }
           if (item) { addItem(this.S, item, 1); await this.ui.say('', `找到了 ${itemName(item)}！`, null); }
           if (item === 'k_necklace' && this.S.quests.q_necklace === 'taken') this.ui.toast('找到了莉莉的項鍊！回港口交給她吧');
@@ -226,7 +236,7 @@ class Game {
 
   // ---------------------------------------------------------------- moving between places
   // dungeon levels are laid out when you enter them; going out from the camp starts a fresh expedition
-  clearDungeons() { for (const k of Object.keys(MAPS)) if (parseId(k)) delete MAPS[k]; this.S.seeds = {}; for (const k of Object.keys(this.S.explored || {})) if (parseId(k)) delete this.S.explored[k]; }
+  clearDungeons() { for (const k of Object.keys(MAPS)) if (parseId(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^d\d_\d_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (parseId(k)) delete this.S.explored[k]; }
   ensureMap(to) {
     const p = parseId(to); if (!p) return;
     if (!MAPS[to]) { const seed = this.S.seeds?.[to]; const def = genLevel(this.S, p.act, p.lvl, seed); this.S.seeds = this.S.seeds || {}; this.S.seeds[to] = def.seed; }
@@ -282,7 +292,7 @@ class Game {
   // ---------------------------------------------------------------- battles
   bgFor() {
     const th = this.field.def.theme, f = this.field;
-    if (f.def.hab) return f.def.hab;
+    if (f.def.bg || f.def.hab) return f.def.bg || f.def.hab;
     if (th === 'field') { const c = f.map.at(Math.floor(f.player.x), Math.floor(f.player.z)); if (c && c.kind === 'snow') return 'snow'; if (c && (c.ch === ':' || f.player.x > 47)) return 'coast'; if (f.player.x > 29 && f.player.z < 30) return 'mountain'; return 'field'; }
     return { port: 'town', anvil: 'town', azurelle: 'town', forest: 'forest', mountain: 'mountain', mine: 'cave', temple: 'temple', sky: 'sky', skyDark: 'void', coast: 'coast', interior: 'town', sanctum: 'temple' }[th] || 'field';
   }

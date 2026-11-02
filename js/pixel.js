@@ -693,6 +693,63 @@ PROP.chest = (c = {}) => {
   p.rect(1, 6, 14, 1, G); p.rect(7, 5, 2, 3, G); p.rect(1, 2, 1, 11, G); p.rect(14, 2, 1, 11, G);
   return p.outline();
 };
+// ---- dungeon dressing: what lies about in each act, and the things treasure is kept in
+const BONE = ramp('#e8e0c8');
+function skull(p, x, y, s = 1) { p.sell(x, y, 2.6 * s, 2.3 * s, BONE); p.rect(x + 0.5 * s, y + 1.4 * s, 2 * s, 1.2 * s, BONE[1]); p.set(x - 1 * s, y, '#2a2020'); p.set(x + 1 * s, y, '#2a2020'); p.set(x, y + 1.5 * s, '#4a3a34'); }
+function bone(p, x0, y0, x1, y1) { p.line(x0, y0, x1, y1, BONE[1]); p.line(x0, y0 + 1, x1, y1 + 1, BONE[2]); for (const [x, y] of [[x0, y0], [x1, y1]]) { p.set(x - 1, y, BONE[0]); p.set(x + 1, y + 1, BONE[0]); } }
+PROP.deadtree = (c = {}) => {
+  const p = new Px(32, 46), B = ramp(c.bark || '#5a4a3a');
+  p.srect(14, 16, 5, 30, B); p.rect(12, 43, 9, 3, B[2]);
+  const arms = [[16, 24, 5, 12], [5, 12, 2, 6], [17, 20, 27, 9], [27, 9, 30, 4], [15, 30, 7, 22], [17, 14, 21, 3], [16, 14, 11, 4], [18, 34, 26, 27]];
+  for (const [x0, y0, x1, y1] of arms) { p.line(x0, y0, x1, y1, B[1]); p.line(x0 + 1, y0 + 1, x1 + 1, y1 + 1, B[2]); }
+  return p.outline('#16120e');
+};
+PROP.bones = () => { const p = new Px(20, 9); bone(p, 2, 6, 9, 4); bone(p, 10, 7, 17, 6); skull(p, 14, 3, 0.9); return p; };
+PROP.skulls = () => { const p = new Px(20, 15); skull(p, 5, 11); skull(p, 14, 11); skull(p, 10, 6); bone(p, 1, 13, 7, 14); return p.outline('#2a2020'); };
+PROP.mushroom = (c = {}) => {
+  const p = new Px(18, 16), C = ramp(c.cap || '#c84a3a'), S = ramp('#e8dcc0');
+  for (const [x, y, r, h] of [[6, 6, 5, 9], [13, 9, 3.5, 6]]) { p.srect(x - 1, y, 3, h, S); p.sell(x, y, r, r * 0.6, C); for (let i = 0; i < 3; i++) p.set(x - r * 0.5 + i * r * 0.5, y - r * 0.25, c.glow ? '#ffffff' : '#f4f0e0'); }
+  return p.outline('#1a1418');
+};
+PROP.tomb = () => { const p = new Px(14, 18), R = ramp('#8a8a90'); p.srect(2, 4, 10, 14, R); p.sell(7, 5, 5, 3.5, R); p.rect(6, 6, 2, 7, R[2]); p.rect(4, 8, 6, 2, R[2]); return p.outline(); };
+PROP.coral = (c = {}) => {
+  const p = new Px(18, 20), col = c.color || '#ff7a6a';
+  const br = (x, y, a, n) => { if (n <= 0) return; const x1 = x + Math.cos(a) * 5, y1 = y - Math.sin(a) * 5; p.line(x, y, x1, y1, col); p.line(x + 1, y, x1 + 1, y1, shade(col, -0.25)); br(x1, y1, a + 0.5, n - 1); br(x1, y1, a - 0.55, n - 1); };
+  br(9, 19, Math.PI / 2, 3); return p.outline('#2a1420');
+};
+PROP.seaweed = () => { const p = new Px(14, 22); for (let k = 0; k < 4; k++) for (let y = 0; y < 18 - k * 2; y++) { const x = 2 + k * 3 + Math.sin(y / 3 + k) * 1.5; p.set(x, 21 - y, ['#3a8a5a', '#2a6a4a', '#5aa86a'][k % 3]); p.set(x + 1, 21 - y, '#1e4a3a'); } return p; };
+PROP.spikes = (c = {}) => { const p = new Px(18, 16), col = c.color || '#3a2a30'; for (let i = 0; i < 5; i++) { const x = 2 + i * 3.4, h = 7 + (i * 7 % 5) * 1.6; for (let y = 0; y < h; y++) { const w = (1 - y / h) * 1.6; p.rect(x - w, 15 - y, w * 2 + 1, 1, y > h - 3 ? '#c8b8b0' : y % 4 === 0 ? shade(col, 0.2) : col); } } return p.outline('#100808'); };
+PROP.tentacle = (c = {}) => { const p = new Px(16, 30), col = c.color || '#7a3a8a'; for (let y = 0; y < 28; y++) { const x = 8 + Math.sin(y / 5) * 3, w = 3.4 * (1 - y / 32); p.rect(x - w, 29 - y, w * 2, 1, shade(col, (y % 6 < 3 ? 0.1 : -0.1))); if (y % 5 === 2) p.set(x + w - 1, 29 - y, '#f0c8e8'); } return p.outline('#1a0a1a'); };
+PROP.banner = (c = {}) => { const p = new Px(12, 36), C = ramp(c.color || '#8a1a1a'); p.srect(5, 0, 2, 36, ramp('#3a3030')); p.srect(1, 3, 10, 18, C); p.set(1, 21, null); p.set(10, 21, null); p.rect(4, 21, 4, 3, C[1]); p.sell(6, 11, 2.4, 2.4, ramp(c.sigil || '#e8c050')); return p.outline(); };
+PROP.obelisk = (c = {}) => { const p = new Px(14, 38), R = ramp(c.stone || '#d8d4e8'); for (let y = 0; y < 36; y++) { const w = y < 4 ? y : 4 + y * 0.06; p.srect(7 - w, y + 2, w * 2 + 1, 1, R); } for (let y = 10; y < 32; y += 5) p.rect(6, y, 2, 2, c.rune || '#8ae8ff'); return p.outline(); };
+PROP.brazier = () => { const p = new Px(14, 20), I = ramp('#4a4048'); p.line(3, 19, 6, 9, I[1]); p.line(10, 19, 8, 9, I[1]); p.srect(1, 7, 12, 3, I); p.sell(7, 5, 4, 3, ramp('#ff9a3a')); p.sell(7, 3, 2, 2.5, ramp('#ffe08a')); return p.outline(); };
+// containers: [closed, open] pictures
+PROP.skeleton = (c = {}) => {
+  const p = new Px(22, 20);
+  bone(p, 4, 18, 10, 15); bone(p, 12, 15, 19, 18); p.srect(8, 8, 6, 8, BONE); for (let y = 9; y < 15; y += 2) p.rect(8, y, 6, 1, BONE[2]);
+  bone(p, 7, 9, 3, 15); bone(p, 14, 9, 18, 13); skull(p, 11, 5);
+  if (!c.open) { p.sell(17, 15, 4, 3.4, ramp('#8a6a3a')); p.rect(16, 11, 2, 2, '#5a3a20'); p.set(18, 15, '#e8c050'); }
+  return p.outline('#2a2020');
+};
+PROP.stump = (c = {}) => { const p = new Px(20, 15), B = ramp('#6a4a2e'); p.srect(2, 4, 16, 11, B); p.sell(10, 4, 8, 3, ramp('#a8845a')); p.sell(10, 4, 5, 2, ramp(c.open ? '#1a1008' : '#2a1a0e')); if (!c.open) { p.set(10, 4, '#ffe080'); p.set(11, 4, '#e8c050'); } p.line(4, 14, 1, 15, B[2]); p.line(15, 14, 19, 15, B[2]); return p.outline('#18100a'); };
+PROP.crystals = (c = {}) => {
+  const p = new Px(20, 24), R = ramp(c.color || '#a88ae8');
+  const shard = (x, h, w) => { for (let y = 0; y < h; y++) { const ww = y > h - 4 ? (h - y) * w / 4 : w; p.rect(x - ww, 23 - y, ww * 2 + 1, 1, y > h * 0.6 ? R[0] : R[1]); p.set(x + ww, 23 - y, R[2]); } };
+  if (c.open) { shard(5, 4, 2); shard(10, 5, 2); shard(15, 3, 2); } else { shard(10, 22, 3); shard(5, 13, 2); shard(15, 15, 2.4); }
+  return p.outline('#1a1430');
+};
+PROP.cocoon = (c = {}) => {
+  const p = new Px(16, 24), R = ramp('#8a3a4a');
+  if (c.open) { p.sell(8, 19, 7, 4.5, R); p.sell(8, 18, 4, 2.4, ramp('#2a0a10')); for (const x of [2, 6, 10, 14]) p.line(x, 16, x + (x < 8 ? -1 : 1), 11, R[0]); }
+  else { p.sell(8, 13, 6.5, 10, R); for (let y = 5; y < 22; y += 3) p.line(3, y, 13, y + 1, R[2]); p.set(7, 10, '#ff8a6a'); p.set(9, 14, '#ff8a6a'); }
+  return p.outline('#1a0808');
+};
+PROP.bonepile = (c = {}) => {
+  const p = new Px(22, 14);
+  if (c.open) { bone(p, 1, 12, 8, 11); bone(p, 12, 12, 20, 11); skull(p, 10, 10, 0.9); }
+  else { p.sell(11, 10, 10, 4, BONE); bone(p, 2, 9, 9, 6); bone(p, 12, 5, 20, 9); skull(p, 7, 6); skull(p, 15, 8, 0.9); p.set(11, 9, '#e8c050'); }
+  return p.outline('#2a2020');
+};
 PROP.npcMark = (c = {}) => { const p = new Px(8, 10); p.srect(2, 0, 4, 6, ramp(c.color || '#ffe04a')); p.srect(2, 7, 4, 3, ramp(c.color || '#ffe04a')); return p.outline(); };
 export function propPx(kind, c = {}) { reseed(kind.length * 311 + JSON.stringify(c).length * 17); const p = PROP[kind](c); p.kind = kind; p.colors = c; return p; }
 // the painted high-resolution version of a prop when there is one, else the pixel sprite

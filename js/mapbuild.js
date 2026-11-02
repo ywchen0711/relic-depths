@@ -70,6 +70,54 @@ class Batch {
   }
 }
 function std(map, opts = {}) { return new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0, ...opts }); }
+// the containers other than a plain chest; each returns anim(p), p going 0 -> 1 as it is opened
+const SPRITE_BOX = { skeleton: 'skeleton', stump: 'stump', crystal: 'crystals', cocoon: 'cocoon', bonepile: 'bonepile' };
+function chestStyle(m, root, cx, y, cz, addSprite) {
+  const st = m.style;
+  if (SPRITE_BOX[st]) {
+    const k = SPRITE_BOX[st], col = m.colors || {};
+    const shut = addSprite(propPx(k, col), cx, cz, y, m.scale || 1.15), open = addSprite(propPx(k, { ...col, open: true }), cx, cz, y, m.scale || 1.15);
+    open.mesh.visible = false;
+    return { anim: (p) => { const done = p >= 0.5; shut.mesh.visible = !done; open.mesh.visible = done; const s = done ? 1 : 1 + Math.sin(p * Math.PI * 6) * 0.06; shut.mesh.scale.set(s, 2 - s, 1); } };
+  }
+  const g = new THREE.Group(); g.position.set(cx, y, cz); g.rotation.y = m.rot || 0; root.add(g);
+  const add = (geo, mat, x, yy, z) => { const me = new THREE.Mesh(geo, mat); me.position.set(x, yy, z); me.castShadow = true; me.receiveShadow = true; g.add(me); return me; };
+  if (st === 'coffin' || st === 'sarc') {
+    const stone = st === 'sarc', mat = stone ? std(tileTex('temple', m.color || '#a8a090')) : std(tileTex('wood', m.color || '#5a3a26'));
+    const [w, h, d] = stone ? [0.8, 0.6, 1.3] : [0.6, 0.38, 1.15];
+    add(new THREE.BoxGeometry(w, h, d), mat, 0, h / 2, 0);
+    const lid = add(new THREE.BoxGeometry(w + 0.08, stone ? 0.16 : 0.1, d + 0.08), mat, 0, h + (stone ? 0.08 : 0.05), 0);
+    if (stone) { const trim = new THREE.MeshStandardMaterial({ color: m.trim || '#c8a050', metalness: 0.7, roughness: 0.35 }); const t = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, d * 0.7), trim); t.position.y = 0.1; lid.add(t); const t2 = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, 0.04, 0.12), trim); t2.position.set(0, 0.1, -d * 0.18); lid.add(t2); }
+    else { const cross = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.5), new THREE.MeshStandardMaterial({ color: '#c8b890', metalness: 0.5 })); cross.position.y = 0.06; lid.add(cross); }
+    const y0 = lid.position.y;
+    return { anim: (p) => { lid.position.x = p * w * 0.75; lid.position.y = y0 + Math.sin(p * Math.PI) * 0.15 - p * (h * 0.4); lid.rotation.z = -p * 0.35; } };
+  }
+  if (st === 'urn') {
+    const pts = [[0, 0], [0.2, 0.02], [0.3, 0.2], [0.32, 0.38], [0.24, 0.56], [0.14, 0.64], [0.17, 0.72], [0, 0.72]].map(([r, h]) => new THREE.Vector2(r, h));
+    const mat = new THREE.MeshStandardMaterial({ color: m.color || '#b8643a', roughness: 0.75 });
+    const urn = add(new THREE.LatheGeometry(pts, 12), mat, 0, 0, 0); urn.scale.setScalar(m.big ? 1.4 : 1.1);
+    const band = add(new THREE.TorusGeometry(0.31, 0.025, 4, 14), new THREE.MeshStandardMaterial({ color: m.trim || '#3a2418' }), 0, 0.42 * urn.scale.y, 0); band.rotation.x = Math.PI / 2; band.scale.setScalar(urn.scale.x);
+    const shards = []; for (let i = 0; i < 6; i++) { const s = add(new THREE.BoxGeometry(0.14, 0.04, 0.1), mat, Math.cos(i) * 0.35, 0.02, Math.sin(i) * 0.35); s.rotation.y = i; s.visible = false; shards.push(s); }
+    return { anim: (p) => { const done = p >= 0.4; urn.visible = band.visible = !done; for (const s of shards) s.visible = done; urn.rotation.z = Math.sin(p * 40) * 0.08; } };
+  }
+  if (st === 'barrel') {
+    const wood = std(tileTex('wood', m.color || '#7a5a3a'));
+    add(new THREE.CylinderGeometry(0.34, 0.3, 0.82, 10), wood, 0, 0.41, 0);
+    for (const yy of [0.16, 0.66]) { const r = add(new THREE.TorusGeometry(0.33, 0.03, 4, 12), new THREE.MeshStandardMaterial({ color: '#3a3a3a', metalness: 0.6, roughness: 0.5 }), 0, yy, 0); r.rotation.x = Math.PI / 2; }
+    const lid = add(new THREE.CylinderGeometry(0.33, 0.33, 0.05, 10), wood, 0, 0.84, 0);
+    return { anim: (p) => { lid.position.set(p * 0.45, 0.84 + Math.sin(p * Math.PI) * 0.4 - p * 0.8, 0); lid.rotation.z = -p * 1.4; } };
+  }
+  if (st === 'clam') {
+    const mat = new THREE.MeshStandardMaterial({ color: m.color || '#e8b8c8', roughness: 0.5, metalness: 0.1, side: THREE.DoubleSide });
+    const half = () => new THREE.SphereGeometry(0.5, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+    const bot = add(half(), mat, 0, 0.18, 0); bot.rotation.x = Math.PI; bot.scale.set(1, 0.35, 0.85);
+    const hinge = new THREE.Group(); hinge.position.set(0, 0.18, -0.4); g.add(hinge);
+    const top = new THREE.Mesh(half(), mat); top.scale.set(1, 0.4, 0.85); top.position.z = 0.4; top.castShadow = true; hinge.add(top);
+    const pearl = add(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshStandardMaterial({ color: '#fff8f0', emissive: '#c8d8ff', emissiveIntensity: 0.6, metalness: 0.3, roughness: 0.15 }), 0, 0.22, 0.05);
+    return { anim: (p) => { hinge.rotation.x = -p * 1.1; pearl.visible = p < 0.9; } };
+  }
+  return null; // a plain chest (wood, iron or gold), built by the caller
+}
 
 // box helper with per-face uv scale
 function boxBatch(B, x0, y0, z0, x1, y1, z1, faces = 'tnsewb', uvScale = 1, col) {
@@ -325,14 +373,18 @@ export function buildMap(scene, map, theme) {
         break;
       }
       case 'chest': {
-        const g = new THREE.Group(); const wood = std(tileTex('wood', m.color || '#9a5a2a')); const gold = new THREE.MeshStandardMaterial({ color: '#e8c050', metalness: 0.8, roughness: 0.3 });
+        // treasure is kept in different things in different places: a skeleton in the desert, a sarcophagus in a crypt...
+        const box = chestStyle(m, root, cx, y, cz, addSprite);
+        if (box) { c.block = true; const ch = { c, kind: 'chest', id: m.id, item: m.item, gil: m.gil, name: m.name, open: false, anim: box.anim }; interact.push(ch); props.push({ id: m.id, chest: ch }); break; }
+        const g = new THREE.Group(); const wood = std(tileTex(m.mat || 'wood', m.color || '#9a5a2a')); const gold = new THREE.MeshStandardMaterial({ color: m.trim || '#e8c050', metalness: 0.8, roughness: 0.3 });
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.45, 0.55), wood); body.position.y = 0.225; body.castShadow = true; g.add(body);
         const lidP = new THREE.Group(); lidP.position.set(0, 0.45, -0.275); g.add(lidP);
         const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.275, 0.275, 0.8, 8, 1, false, 0, Math.PI), wood); lid.rotation.z = Math.PI / 2; lid.rotation.y = Math.PI / 2; lid.position.set(0, 0, 0.275); lid.castShadow = true; lidP.add(lid);
         const band = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.05), gold); band.position.set(0, 0.42, 0.29); g.add(band);
         for (const sx of [-0.36, 0.36]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.46, 0.57), gold); b.position.set(sx, 0.23, 0); g.add(b); }
         g.position.set(cx, y, cz); root.add(g); c.block = true;
-        const ch = { c, kind: 'chest', id: m.id, item: m.item, gil: m.gil, lidP, open: false };
+        if (m.big) g.scale.setScalar(1.25);
+        const ch = { c, kind: 'chest', id: m.id, item: m.item, gil: m.gil, name: m.name, lidP, open: false };
         interact.push(ch); props.push({ id: m.id, chest: ch });
         break;
       }
@@ -434,6 +486,12 @@ export function buildMap(scene, map, theme) {
         for (let i = 0; i <= 1; i++) { const cc = map.at(c.i + i, c.j); if (cc) cc.block = true; }
         interact.push({ c, kind: 'board', id: m.id, w: 2, x0: c.i, x1: c.i + 2 });
         break;
+      }
+      case 'brazier': {
+        const s = addSprite(propPx('brazier'), cx, cz, y, 1.1);
+        s.mat.emissive = new THREE.Color('#ff7a30'); s.mat.emissiveMap = s.tex; s.mat.emissiveIntensity = 0.8;
+        addLight(cx, y + 1.2, cz + 0.3, m.color || '#ff8a3a', 7, 6); anims.push({ flame: [cx, y + 0.9, cz] });
+        c.block = true; break;
       }
       case 'torch': {
         const s = addSprite(propPx('lamp'), cx, cz, y, 0.8);

@@ -38,9 +38,17 @@ const BG = {
   void: { tile: ['temple', '#5a4a7a'], side: ['crystal', '#5a3a8a'], sky: ['#0a0418', '#4a1a4a'], props: [['crystal', { color: '#c8a0ff' }], ['crystal', { color: '#ff6a9a' }]], light: 'void', fog: '#1a0a2a', pillars: true, clouds: true },
   snow: { tile: ['snow', '#eef2f8'], side: ['snow', '#d8e0ec'], sky: ['#8aa8d8', '#f0f4f8'], props: [['pine', { snow: true, leaf: '#3a6a5a' }], ['rock', { color: '#c8d0dc' }]], light: 'day', fog: '#e8eef4' },
   town: { tile: ['cobble', '#cdbb9a'], side: ['brick', '#b8aa94'], sky: ['#6aa0e8', '#f4e4c8'], props: [['bush', { flower: '#f47a7a' }], ['tree', {}]], light: 'day', fog: '#c8d8e8' },
+  wilds: { tile: ['grass', '#7a8a48'], side: ['dirt', '#8a7454'], sky: ['#6a7a8a', '#d8c8a8'], props: [['deadtree', {}], ['rock', {}], ['tomb', {}], ['deadtree', { bark: '#4a3e34' }], ['bush', { leaf: '#6a7a3a' }]], light: 'day', fog: '#b8a890' },
+  crypt: { tile: ['cobble', '#7a7068'], side: ['brick', '#5a4a44'], sky: ['#0a0808', '#1a1210'], props: [['skulls', {}], ['tomb', {}], ['bones', {}], ['spikes', { color: '#5a5048' }]], light: 'cave', fog: '#140e0c', pillars: true, torches: true },
+  desert: { tile: ['sand', '#e4c488'], side: ['stonewall', '#c8a070'], sky: ['#e8a860', '#f8e8c0'], props: [['cactus', {}], ['rock', { color: '#c8a070' }], ['skulls', {}], ['deadtree', { bark: '#a08a6a' }]], light: 'day', fog: '#f0d8a8' },
+  badlands: { tile: ['dirt', '#b07a4a'], side: ['stonewall', '#a06a48'], sky: ['#d87a4a', '#f4d0a0'], props: [['deadtree', {}], ['rock', { color: '#a06a48' }], ['bones', {}], ['cactus', {}]], light: 'day', fog: '#e0a070' },
+  seacave: { tile: ['cave', '#4a6a70'], side: ['cave', '#2e4850'], sky: ['#04101a', '#0a2030'], props: [['coral', {}], ['seaweed', {}], ['rock', { color: '#3a5a60' }], ['coral', { color: '#ffb08a' }]], light: 'deep', fog: '#081a20', torches: true },
+  hell: { tile: ['cave', '#5a2a24'], side: ['cave', '#2a1210'], sky: ['#1a0404', '#5a1408'], props: [['spikes', {}], ['skulls', {}], ['tentacle', { color: '#8a2a2a' }]], light: 'hell', fog: '#200806', torches: true },
+  castle: { tile: ['brick', '#4a3a40'], side: ['brick', '#2e2428'], sky: ['#0a0408', '#2a0a14'], props: [['banner', { color: '#8a1a1a' }], ['skulls', {}], ['brazier', {}], ['spikes', {}]], light: 'void', fog: '#14080c', pillars: true, torches: true },
   arena: { tile: ['sand', '#d8c08a'], side: ['brick', '#a87a5a'], sky: ['#5a96e8', '#f0e8d0'], props: [['bush', {}]], light: 'day', fog: '#e8d8b8', pillars: true },
 };
 const LIGHT = {
+  hell: [['#ff8a5a', 1.1], ['#a84a2a', '#2a0a06', 0.75]],
   day: [['#fff0d8', 2.6], ['#c4dcff', '#8a7a5a', 1.0]], forest: [['#f0f4c8', 2.0], ['#9ac09a', '#3a4a2a', 0.8]], cave: [['#8a8aaa', 0.6], ['#5a5a7a', '#1a1418', 0.7]],
   deep: [['#6ac8ff', 0.8], ['#3a7a9a', '#0a1a2a', 0.7]], sky: [['#fff8f0', 2.8], ['#d0dcff', '#d8c8e8', 1.1]], void: [['#c8a0ff', 1.2], ['#6a4a8a', '#1a0a2a', 0.7]],
 };
