@@ -265,6 +265,8 @@ body.inbattle .tb-b { right: auto; left: 0; bottom: 0; width: 64px; height: 64px
 
 .pd-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; } .pd-row figure { margin: 0; text-align: center; } .pd-row img { width: 72px; height: 114px; image-rendering: pixelated; object-fit: contain; background: radial-gradient(circle at 50% 70%, rgba(255,255,255,0.12), transparent 70%); border-radius: 6px; } .pd-row figcaption { font-size: 11px; color: var(--dim); } .pd-row span { color: var(--dim); }
 
+.eq-wrap { display: flex; gap: 16px; align-items: flex-start; } .eq-side { flex: 1; min-width: 0; }
+.pd-big { margin: 0; flex: none; text-align: center; position: sticky; top: 0; } .pd-big img { display: block; width: 168px; height: 266px; image-rendering: pixelated; object-fit: contain; background: radial-gradient(ellipse at 50% 78%, rgba(255,255,255,0.16), transparent 68%); border-radius: 10px; } .pd-big figcaption { font-size: 12px; color: var(--gold, #ffd86a); margin-top: 2px; }
 .gi-pic { float: right; width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; margin: 0 0 4px 8px; background: radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%); border-radius: 8px; }
 
 
@@ -316,7 +318,7 @@ body.touchy .ch-back, body.touchy .bc-back { font-size: 15px; padding: 8px 12px;
   .ch-info { font-size: 13px; padding: 8px; }
   .chooser.small { padding: 0 12px calc(130px + var(--sb)) 0; }
   .st { flex-direction: row; gap: 8px; } .st-big { width: 56px; height: 90px; }
-  .pd-row img { width: 56px; height: 88px; } .gi-pic { width: 64px; height: 64px; }
+  .pd-row img { width: 56px; height: 88px; } .eq-wrap { gap: 10px; } .pd-big img { width: 104px; height: 165px; } .gi-pic { width: 64px; height: 64px; }
   .b-party { width: min(250px, 60vw); } .b-pn { width: 52px; font-size: 12px; }
   .b-cmd { max-width: 46vw; min-width: 140px; padding: 6px; } .bc-it { font-size: 14px; padding: 5px 8px; } .bc-list { max-height: 40dvh; }
   .b-tl { padding: 4px 8px; } .ti { width: 24px; height: 24px; font-size: 12px; } .tl-l { display: none; }

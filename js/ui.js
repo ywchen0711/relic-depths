@@ -341,7 +341,8 @@ export class UI {
       const h = S.heroes[id];
       const rows = EQUIP_SLOTS.map(sl => ({ label: SLOT_N[sl], sub: GEAR[h.equip[sl]]?.name || (sl === 'L' && GEAR[h.equip.R]?.hands === 2 ? '（雙手武器）' : '—') }));
       rows.push({ label: '⚙ 最強裝備', sub: '自動挑選' }, { label: '全部卸下', sub: '' }, { label: '換人', sub: '◀ ▶' });
-      const i = await this.choose(rows, { title: HEROES[id].name + '　裝備', info: (k) => k < EQUIP_SLOTS.length && h.equip[EQUIP_SLOTS[k]] ? this.gearHTML(h.equip[EQUIP_SLOTS[k]], id) : this.statusHTML(id), start, lr: (k, d) => { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + d + all.length) % all.length]; start = k; return 'close'; } });
+      const doll = this.dollHTML(paperLook(S, id), HEROES[id].name);
+      const i = await this.choose(rows, { title: HEROES[id].name + '　裝備', info: (k) => `<div class="eq-wrap">${doll}<div class="eq-side">${k < EQUIP_SLOTS.length && h.equip[EQUIP_SLOTS[k]] ? this.gearHTML(h.equip[EQUIP_SLOTS[k]], id) : this.statusHTML(id)}</div></div>`, start, lr: (k, d) => { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + d + all.length) % all.length]; start = k; return 'close'; } });
       if (i === -2) continue;
       if (i < 0) return;
       start = i;
@@ -351,7 +352,7 @@ export class UI {
       const slot = EQUIP_SLOTS[i];
       const opts = Object.keys(S.items).filter(g => S.items[g] > 0 && GEAR[g] && slotFits(slot, g) && canEquip(id, g, S)).sort((a, b) => (GEAR[b].tier || 0) - (GEAR[a].tier || 0) || (GEAR[b].price || 0) - (GEAR[a].price || 0));
       if (!opts.length && !h.equip[slot]) { this.toast(`沒有${HEROES[id].name}能裝在「${SLOT_N[slot]}」的東西`); continue; }
-      const j = await this.choose([{ label: '（卸下）' }, ...opts.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: this.gearKind(GEAR[g]) + (S.items[g] > 1 ? ' ×' + S.items[g] : '') }))], { title: SLOT_N[slot], info: (k) => k === 0 ? this.compareWith(id, slot, null) : this.compareWith(id, slot, opts[k - 1]) + this.gearHTML(opts[k - 1], id) });
+      const j = await this.choose([{ label: '（卸下）' }, ...opts.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: this.gearKind(GEAR[g]) + (S.items[g] > 1 ? ' ×' + S.items[g] : '') }))], { title: SLOT_N[slot], info: (k) => k === 0 ? this.compareWith(id, slot, null) : this.compareWith(id, slot, opts[k - 1], this.gearHTML(opts[k - 1], id)) });
       if (j < 0) continue;
       equip(S, id, slot, j === 0 ? null : opts[j - 1]); this.G.audio.sfx('item');
     }
@@ -375,10 +376,12 @@ export class UI {
     if (other && G && (G.hands === 2 || GEAR[eq[other]]?.hands === 2)) eq[other] = null;
     return paperLook(this.S, id, eq);
   }
-  compareWith(id, slot, g) {
+  // the hero, big, as the equipment screens show them
+  dollHTML(look, cap) { return `<figure class="pd-big"><img src="${fullSprite(look)}"><figcaption>${cap}</figcaption></figure>`; }
+  compareWith(id, slot, g, more = '') {
     const before = heroStats(this.S, id), after = this.tryOn(id, slot, g);
-    const now = fullSprite(paperLook(this.S, id)), next = fullSprite(this.tryOnLook(id, slot, g));
-    return `<div class="pd-row"><figure><img src="${now}"><figcaption>現在</figcaption></figure><span>▶</span><figure><img src="${next}"><figcaption>試穿</figcaption></figure></div><div class="cmp">${['hp', 'mp', 'atk', 'def', 'mag', 'spr', 'spd'].map(k => { const d = after[k] - before[k]; return `<div><span>${({ hp: 'HP', mp: 'MP', atk: '攻擊', def: '防禦', mag: '魔力', spr: '精神', spd: '速度' })[k]}</span><b>${before[k]}</b>→<b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${after[k]}</b></div>`; }).join('')}</div>`;
+    const now = fullSprite(paperLook(this.S, id));
+    return `<div class="eq-wrap">${this.dollHTML(this.tryOnLook(id, slot, g), g ? '試穿中' : '卸下後')}<div class="eq-side"><div class="pd-row"><figure><img src="${now}"><figcaption>現在</figcaption></figure></div><div class="cmp">${['hp', 'mp', 'atk', 'def', 'mag', 'spr', 'spd'].map(k => { const d = after[k] - before[k]; return `<div><span>${({ hp: 'HP', mp: 'MP', atk: '攻擊', def: '防禦', mag: '魔力', spr: '精神', spd: '速度' })[k]}</span><b>${before[k]}</b>→<b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${after[k]}</b></div>`; }).join('')}</div>${more}</div></div>`;
   }
   compare(id, slot, g) { return this.compareWith(id, slot, g); }
   async magicMenu(pre) {
