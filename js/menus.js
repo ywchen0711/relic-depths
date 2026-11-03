@@ -103,7 +103,7 @@ P.bagMenu = async function (o = {}) {
     const a = await this.choose(acts, { title: G.name, cls: 'small' });
     if (a === 0) {
       const who = [...S.party, ...S.reserve].filter(id => canEquip(id, g, S));
-      if (!who.length) { this.toast('沒有人能裝備（職業或等級不符）'); continue; }
+      if (!who.length) { const later = [...S.party, ...S.reserve].filter(id => canEquip(id, g)); this.toast(later.length ? `需要 Lv ${G.lvReq} 才能裝備（${later.map(id => HEROES[id].name).join('、')}）` : '隊伍裡沒有職業能裝備'); continue; }
       const w = await this.choose(who.map(id => ({ label: HEROES[id].name, sub: 'Lv ' + S.heroes[id].lv, icon: portrait(id) })), { title: '裝備給誰？', info: (k) => this.compareWith(who[k], slotFor(G, S.heroes[who[k]]), g) });
       if (w < 0) continue;
       equip(S, who[w], slotFor(G, S.heroes[who[w]]), g); this.G.audio.sfx('item');
@@ -117,7 +117,7 @@ function slotFor(G, h) {
   return G.slot;
 }
 P.removeGear = function (g) { const S = this.S; S.items[g]--; if (S.items[g] <= 0) { delete S.items[g]; if (GEAR[g]?.loot) dropLoot(S, g); } };
-P.whoCanWear = function (g) { const S = this.S, who = Object.keys(S.heroes).filter(id => canEquip(id, g, S)); return `<div class="dim">可以裝備：${who.map(id => HEROES[id].name).join('、') || '—'}</div>`; };
+P.whoCanWear = function (g) { const S = this.S, who = Object.keys(S.heroes).filter(id => canEquip(id, g)); return `<div class="dim">可以裝備：${who.map(id => HEROES[id].name + (canEquip(id, g, S) ? '' : `（Lv ${GEAR[g].lvReq} 才能裝）`)).join('、') || '—'}</div>`; };
 
 // ---------------------------------------------------------------- the stash in the camp
 P.stashMenu = async function () {
@@ -175,7 +175,7 @@ P.sellMenu = function () {
   const picked = new Set(); let sel = 0, list = [];
   return new Promise((res) => {
     const wrap = document.createElement('div'); wrap.className = 'chooser wide sellwin'; this.layer.appendChild(wrap);
-    const nobody = (g) => !Object.keys(S.heroes).some(id => canEquip(id, g, S));
+    const nobody = (g) => !Object.keys(S.heroes).some(id => canEquip(id, g)); // by class only: a piece for later is not junk
     const refresh = () => {
       const r = SELL_RAR[f.rar][1], c = SELL_CAT[f.cat][1];
       list = this.gearOwned().filter(g => (r == null || (GEAR[g].rarity ?? 0) === r) && (c == null || catOf(GEAR[g]) === c) && (!f.useless || nobody(g)));

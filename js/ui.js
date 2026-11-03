@@ -440,8 +440,10 @@ export class UI {
       if (i === EQUIP_SLOTS.length + 2) { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + 1) % all.length]; continue; }
       const slot = EQUIP_SLOTS[i];
       const opts = Object.keys(S.items).filter(g => S.items[g] > 0 && GEAR[g] && slotFits(slot, g) && canEquip(id, g, S)).sort((a, b) => (GEAR[b].tier || 0) - (GEAR[a].tier || 0) || (GEAR[b].price || 0) - (GEAR[a].price || 0));
-      if (!opts.length && !h.equip[slot]) { this.toast(`沒有${HEROES[id].name}能裝在「${SLOT_N[slot]}」的東西`); continue; }
-      const j = await this.choose([{ label: '（卸下）' }, ...opts.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: this.gearKind(GEAR[g]) + (S.items[g] > 1 ? ' ×' + S.items[g] : '') }))], { title: SLOT_N[slot], info: (k) => k === 0 ? this.compareWith(id, slot, null) : this.compareWith(id, slot, opts[k - 1], this.gearHTML(opts[k - 1], id)) });
+      // what this class can wear but not yet at this level: listed, greyed, with the level it needs
+      const locked = Object.keys(S.items).filter(g => S.items[g] > 0 && GEAR[g] && slotFits(slot, g) && !canEquip(id, g, S) && canEquip(id, g)).sort((a, b) => (GEAR[a].lvReq || 0) - (GEAR[b].lvReq || 0));
+      if (!opts.length && !locked.length && !h.equip[slot]) { this.toast(`沒有${HEROES[id].name}能裝在「${SLOT_N[slot]}」的東西`); continue; }
+      const j = await this.choose([{ label: '（卸下）' }, ...opts.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: this.gearKind(GEAR[g]) + (S.items[g] > 1 ? ' ×' + S.items[g] : '') })), ...locked.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: `需要 Lv ${GEAR[g].lvReq}`, disabled: true }))], { title: SLOT_N[slot], info: (k) => k === 0 ? this.compareWith(id, slot, null) : k > opts.length ? this.gearHTML(locked[k - 1 - opts.length], id) : this.compareWith(id, slot, opts[k - 1], this.gearHTML(opts[k - 1], id)) });
       if (j < 0) continue;
       equip(S, id, slot, j === 0 ? null : opts[j - 1]); this.G.audio.sfx('item');
     }
@@ -806,7 +808,7 @@ export class UI {
       await this.info(this.gearHTML(o.id), '覺醒完成！');
     }
   }
-  whoCan(g) { const S = this.S; return `<div class="cmp">${Object.keys(S.heroes).map(id => canEquip(id, g) ? `<div><span>${HEROES[id].name}</span>${this.compareShort(id, g)}</div>` : `<div class="dim"><span>${HEROES[id].name}</span>不能裝備</div>`).join('')}</div>`; }
+  whoCan(g) { const S = this.S; return `<div class="cmp">${Object.keys(S.heroes).map(id => canEquip(id, g) ? `<div><span>${HEROES[id].name}</span>${canEquip(id, g, S) ? this.compareShort(id, g) : `<b class="dn">需要 Lv ${GEAR[g].lvReq}</b>`}</div>` : `<div class="dim"><span>${HEROES[id].name}</span>不能裝備</div>`).join('')}</div>`; }
   compareShort(id, g) { const S = this.S, G = GEAR[g], slot = G.slot === 'hand' ? (G.type === 'shield' ? 'L' : 'R') : G.slot === 'acc' ? 'acc1' : G.slot, b = heroStats(S, id); const a = this.tryOn(id, slot, g); const k = G.slot === 'hand' && G.type !== 'shield' ? (G.mag > G.atk ? 'mag' : 'atk') : 'def'; const d = a[k] - b[k]; return `<b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${({ atk: '攻', mag: '魔', def: '防' })[k]} ${d >= 0 ? '+' : ''}${d}</b>`; }
   async inn(price) {
     const S = this.S;

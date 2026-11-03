@@ -100,7 +100,7 @@ const RW = [
   ['rw_meteor', '流星', [1, 14, 13, 1], 'W', { ed: 160, fx: { elUp: { fire: 0.4 }, proc: [P('hit', 'pr_meteor', 15, 0.12)] } }, '天上的火，聽它的話'],
   ['rw_prism', '稜鏡', [14, 1, 2, 3], 'W', { mag: 40, fx: { elUp: { fire: 0.25, ice: 0.25, thunder: 0.25 }, pierce: { fire: 0.15, ice: 0.15, thunder: 0.15 } } }, '一道光，拆成三種顏色'],
   ['rw_venom', '毒牙', [7, 4, 15], 'W', { ed: 150, fx: { onHit: { poison: 0.5 }, proc: [P('hit', 'pr_venom', 12, 0.25)] } }, '傷口會說話：好癢'],
-  ['rw_grave', '墓語', [8, 16, 7], 'W', { mag: 30, fx: { skillCls: { necro: 2 }, proc: [P('kill', 'pr_corpse', 14, 1)] } }, '倒下的敵人，還能再用一次'],
+  ['rw_grave', '墓語', [8, 16, 7], 'W', { mag: 30, fx: { skillAll: 1, proc: [P('kill', 'pr_corpse', 14, 1)] } }, '倒下的敵人，還能再用一次'],
   ['rw_call', '號召', [17, 13, 16, 3], 'W', { ed: 200, hp: 100, fx: { skillAll: 1, proc: [P('start', 'pr_shout', 16, 1), P('start', 'pr_haste', 12, 1)] } }, '舉起它，所有人都聽得見'],
   ['rw_judge', '審判', [0, 18, 17], 'W', { ed: 200, fx: { slay: { undead: 2, demon: 2 }, pierce: { light: 0.25 }, proc: [P('hit', 'pr_holy', 18, 0.15)] } }, '光不會原諒任何東西'],
   ['rw_sanct', '聖域', [0, 16, 18], 'shield', { edef: 150, fx: { mblock: 0.2, res: all8(25), proc: [P('struck', 'pr_heal', 15, 0.2)] } }, '站在它後面就很安全'],

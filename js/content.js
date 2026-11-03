@@ -537,13 +537,14 @@ export function fxText(fx) {
   if (fx.drain) o.push(`吸血${Math.round(fx.drain * 100)}%`); if (fx.mpdrain) o.push(`吸魔${Math.round(fx.mpdrain * 100)}%`);
   if (fx.crit) o.push(`會心+${Math.round(fx.crit * 100)}%`); if (fx.dbl) o.push(`${Math.round(fx.dbl * 100)}%連擊`); if (fx.brk) o.push(`${Math.round(fx.brk * 100)}%無視弱點破防`);
   if (fx.slay) for (const [f, m] of Object.entries(fx.slay)) o.push(`對${FAM_N[f]}×${m}`);
-  if (fx.first) o.push(fx.first >= 1 ? '先制' : `${Math.round(fx.first * 100)}%先制`); if (fx.lowhp) o.push('背水（HP越低越強）'); if (fx.mpcost) o.push(`MP消耗-${Math.round(fx.mpcost * 100)}%`);
+  if (fx.first) o.push(fx.first >= 1 ? '先制' : `${Math.round(fx.first * 100)}%先制`); if (fx.lowhp) o.push('背水（HP越低越強）'); if (fx.mpcost) o.push(fx.mpcost > 0 ? `MP消耗-${Math.round(fx.mpcost * 100)}%` : `MP消耗+${Math.round(-fx.mpcost * 100)}%`);
   if (fx.resist) for (const [e, v] of Object.entries(fx.resist)) if (v !== 1) o.push(v < 0 ? `吸收${ELEM[e]}` : v === 0 ? `${ELEM[e]}無效` : v < 1 ? `${ELEM[e]}抗性${Math.round((1 - v) * 100)}%` : `${ELEM[e]}抗性-${Math.round((v - 1) * 100)}%`);
   if (fx.immune) o.push('防' + [...new Set(fx.immune)].map(s => STATUS_N[s]).join('、'));
   if (fx.auto) o.push('自動' + fx.auto.map(s => STATUS_N[s]).join('、'));
   if (fx.block) o.push(`格擋${Math.round(fx.block * 100)}%`); if (fx.mblock) o.push(`擋魔法${Math.round(fx.mblock * 100)}%`);
   if (fx.counter) o.push(`反擊${Math.round(fx.counter * 100)}%`); if (fx.thorns) o.push(`反傷${Math.round(fx.thorns * 100)}%`); if (fx.evade) o.push(`閃避+${Math.round(fx.evade * 100)}%`);
-  if (fx.hpP) o.push(`HP+${Math.round(fx.hpP * 100)}%`); if (fx.mpP) o.push(`MP+${Math.round(fx.mpP * 100)}%`); if (fx.mpregen) o.push('每回合回MP'); if (fx.survive) o.push('不屈'); if (fx.cover) o.push('保護瀕死隊友');
+  if (fx.hpP) o.push(`HP+${Math.round(fx.hpP * 100)}%`); if (fx.mpP) o.push(`MP+${Math.round(fx.mpP * 100)}%`); if (fx.mpregen) o.push(`每回合回MP ${Math.round(fx.mpregen * 100)}%`); if (fx.survive) o.push('不屈'); if (fx.cover) o.push('保護瀕死隊友');
+  for (const [k, n] of [['atkP', '攻擊'], ['magP', '魔力'], ['defP', '防禦'], ['sprP', '精神']]) if (fx[k]) o.push(`${n}+${Math.round(fx[k] * 100)}%`); if (fx.spdF) o.push(`速度+${fx.spdF}`);
   if (fx.limitup) o.push(`極限+${Math.round(fx.limitup * 100)}%`); if (fx.healup) o.push(`回復+${Math.round(fx.healup * 100)}%`); if (fx.steal) o.push(`偷竊+${Math.round(fx.steal * 100)}%`);
   if (fx.exp) o.push(`經驗+${Math.round(fx.exp * 100)}%`); if (fx.gil) o.push(`金幣+${Math.round(fx.gil * 100)}%`); if (fx.drop) o.push(`掉寶+${Math.round(fx.drop * 100)}%`); if (fx.ap) o.push(`AP+${Math.round(fx.ap * 100)}%`);
   if (fx.elUp) for (const [e, v] of Object.entries(fx.elUp)) o.push(`${ELEM[e]}屬性傷害+${Math.round(v * 100)}%`);
