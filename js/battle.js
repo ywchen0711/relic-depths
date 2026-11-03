@@ -213,7 +213,7 @@ export class Battle {
     const M = MINIONS[`${u.hero}_${treeIdx}`]; if (!M) return;
     const T = M[S.minion], lv = S.lvSkill || 1, up = 1 + (u.fx?.minionUp || 0), extra = u.fx?.minionCap ? 1 : 0;
     const cap = (T.big ? 1 : S.minion === 'A' ? Math.min(4, 1 + Math.floor(lv / 5)) : Math.min(3, 1 + Math.floor(lv / 8))) + extra;
-    const k = 1 + 0.05 * (lv - 1), ka = 0.8 * (1 + 0.04 * (lv - 1));
+    const k = 1 + 0.08 * (lv - 1), ka = 1.15 * (1 + 0.09 * (lv - 1)); // they grow with the skill about as fast as a spell does
     const st = { hp: Math.round(u.st.hp * T.hp * k * up), mp: 0, atk: Math.round(Math.max(u.st.mag, u.st.atk) * T.atk * ka * up), mag: Math.round(Math.max(u.st.mag, u.st.atk) * T.atk * ka * up), def: Math.round(u.st.def * 0.7 * up), spr: Math.round(u.st.spr * 0.7 * up), spd: Math.round(u.st.spd * (T.big ? 0.8 : 1.05)) };
     const same = this.minions.filter(m => m.owner === u.hero && m.rec.slot === S.minion && m.rec.tree === treeIdx);
     if (same.length >= cap || this.minions.length >= MSLOTS.length) {
@@ -438,7 +438,7 @@ export class Battle {
   }
   checkEnd() {
     if (!this.foes.length) this.result = 'win';
-    else if (!this.allies.length) this.result = 'lose';
+    else if (!this.party.some(u => u.alive)) this.result = 'lose'; // minions do not fight on once every hero has fallen
   }
 
   async turn(u) {
