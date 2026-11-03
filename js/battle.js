@@ -1419,6 +1419,10 @@ export class Battle {
       if (Math.random() < 0.18) { const pot = il < 15 ? 'potion' : il < 35 ? 'hipotion' : 'i_hp3'; addItem(this.S, pot, 1); drops.push(pot); }
       if (Math.random() < 0.08) { addItem(this.S, il < 25 ? 'ether' : 'hiether', 1); drops.push(il < 25 ? 'ether' : 'hiether'); }
       if (Math.random() < 0.05) { addItem(this.S, 'i_tp', 1); drops.push('i_tp'); }
+      // the rare treasures: forgetting water and the book of a new class
+      const tq = (boss ? 1 : u.rank === 2 ? 0.25 : u.rank === 1 ? 0.06 : 0.012) * rich;
+      if (Math.random() < 0.08 * tq) { addItem(this.S, 'i_respec', 1); drops.push('i_respec'); }
+      if (Math.random() < 0.03 * tq) { addItem(this.S, 'i_reclass', 1); drops.push('i_reclass'); }
     }
     for (const uid of loot) addItem(this.S, uid, 1);
     this.S.gil += gil;

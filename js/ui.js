@@ -8,7 +8,7 @@ import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
 import { STATE_N, STATE_DESC, REACTIONS, PAIRS, huntText, NEW_ECHOES } from './depth.js?v=1';
 import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken, socketItem, insertRune } from './loot.js?v=1';
 import { RUNES, RUNEWORDS, runeColor, runeFx, matchRuneword, runewordsFor, runeStr, maxSockets, sockKind, RW_SLOT_N } from './runes.js?v=1';
-import { CLASSES } from './classes.js?v=1';
+import { CLASSES, TREES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
 import { personSheet, battleSheet } from './pixel.js?v=1';
 import { lookOf } from './field.js?v=1';
@@ -519,6 +519,26 @@ export class UI {
     const S = this.S, I = ITEMS[id];
     if (!I || !I.use || I.use.dmg || I.use.escape || I.use.status && !I.use.self || I.use.analyze || I.use.cast || I.use.buff || I.use.evadeT) { if (I?.use) this.toast('戰鬥中才能使用'); return; }
     const spend = () => { S.items[id]--; if (!S.items[id]) delete S.items[id]; this.hud(); };
+    if (I.use.respec) {
+      const hid = await this.heroPick('要讓誰忘記技能？', true); if (!hid) return;
+      const n = Object.values(S.heroes[hid].pts || {}).reduce((a, b) => a + b, 0);
+      if (!n) { this.toast(`${HEROES[hid].name} 還沒有把點數放進技能樹`); return; }
+      if (!await this.yesno(`讓 ${HEROES[hid].name} 喝下遺忘之水？\n投入技能樹的 ${n} 點會全部退回，可以重新分配。\n召喚物也會離開。`)) return;
+      spend(); const { resetSkills } = await import('./party.js?v=1'); resetSkills(S, hid); this.G.audio.sfx('heal');
+      await this.info(`<p>${HEROES[hid].name} 忘記了所有技能。</p><p>退回 <b>${n}</b> 點技能點數，現在共有 <b>${S.heroes[hid].sp}</b> 點。到選單的「技能」重新分配。</p>`, '遺忘之水'); return;
+    }
+    if (I.use.reclass) {
+      const hid = await this.heroPick('要讓誰轉職？', true); if (!hid) return;
+      const cur = clsOf(hid), opts = Object.keys(CLASSES).filter(c => c !== cur);
+      const j = await this.choose(opts.map(c => ({ label: CLASSES[c].name, sub: CLASSES[c].weapons.map(w => WPN[w] || w).join('、') })), { title: `${HEROES[hid].name}（${CLASSES[cur].name}）要轉成哪個職業？`, info: (k) => `<div class="gi"><h4>${CLASSES[opts[k]].name}</h4><div>${CLASSES[opts[k]].bio || ''}</div><div class="gi-kind">武器：${CLASSES[opts[k]].weapons.map(w => WPN[w] || w).join('、')}${CLASSES[opts[k]].shield ? '＋盾' : ''}</div><div class="gi-kind">技能樹：${TREES[opts[k]].map(t => t.name).join('、')}</div></div>` });
+      if (j < 0) return;
+      const to = opts[j], name = HEROES[hid].name;
+      if (!await this.yesno(`讓 ${name === CLASSES[cur].name ? '主角' : name}從${CLASSES[cur].name}轉成${CLASSES[to].name}？\n等級和經驗不變；技能點數和屬性點數全部退回重新分配。\n${CLASSES[to].name}不能用的裝備會放回背包。`)) return;
+      const { changeClass } = await import('./party.js?v=1'); const r = changeClass(S, hid, to);
+      if (!r) { this.toast('不能轉職'); return; }
+      spend(); this.G.audio.sfx('levelup'); this.G.field?.setLeader?.(S.party[0]); this.hud();
+      await this.info(`<p>${S.lead === r.id ? '主角' : HEROES[r.id].name}成為了<b>${CLASSES[to].name}</b>！</p><p>技能點數 <b>${S.heroes[r.id].sp}</b> 點、屬性點數 <b>${S.heroes[r.id].stp}</b> 點，到選單的「技能」和「屬性」重新分配。</p>${r.removed.length ? `<p>放回背包：${r.removed.map(g => GEAR[g]?.name || g).join('、')}</p>` : ''}`, '轉職'); return;
+    }
     if (I.use.townPortal) { const f = this.G.field; if (f.def.town) { this.toast('已經在營地了'); return; } spend(); S.portal = { map: f.mapId, x: Math.floor(f.player.x), z: Math.floor(f.player.z) }; this.G.audio.sfx('flee'); this.G.menuOpen = false; this.closeMenus = true; await this.G.warp('town', 15, 18, 'down'); this.toast('走進營地的藍色傳送門，或在水晶選「回到傳送門」，就能回到原處', 3500); return; }
     if (I.use.tent) { if (!this.G.nearSave()) { this.toast('要在存檔水晶旁使用'); return; } spend(); const { healAll } = await import('./party.js?v=1'); healAll(S); this.G.audio.sfx('heal'); this.toast('全員完全回復了！'); return; }
     if (I.use.meal) { S.meal = { fx: I.use.meal, n: 5, name: I.name }; spend(); this.G.audio.sfx('heal'); this.toast(`吃了${I.name}！之後5場戰鬥都有效果`); return; }

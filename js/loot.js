@@ -7,6 +7,9 @@
 // An item lives in S.loot[uid] as a small spec; at load it is turned into a GEAR entry under its uid, so the rest of
 // the game (stats, battles, paper dolls) treats it like any other piece of equipment.
 import { GEAR, ELEM, ITEMS, forgetGear } from './data.js?v=1';
+// rare treasures: change a hero's class, or take back their skill points
+ITEMS.i_reclass = { name: '轉職之書', price: 30000, sell: 3000, use: { reclass: true }, field: true, cat: 'treasure', desc: '讓一位隊員換成另一個職業：等級和經驗不變，技能點數和屬性點數全部退回重新分配，新職業不能用的裝備會放回背包' };
+ITEMS.i_respec = { name: '遺忘之水', price: 12000, sell: 1200, use: { respec: true }, field: true, cat: 'treasure', desc: '讓一位隊員忘記所有技能：投入技能樹的點數全部退回，可以重新分配' };
 ITEMS.i_tp = { name: '回城卷軸', price: 60, use: { townPortal: true }, field: true, desc: '打開通往營地的傳送門；走進營地的藍色傳送門（或在水晶選「回到傳送門」）就回到原地', cat: 'tool' };
 import { WTYPES, mergeFx, FAM_N, STATUS_N } from './content.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';

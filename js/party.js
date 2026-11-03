@@ -58,6 +58,37 @@ export function dismissHero(S, id) {
   S.minions = (S.minions || []).filter(m => m.owner !== id); delete HEROES[id];
   return true;
 }
+// the treasures: forget every skill (the points come back), or become another class altogether
+export function resetSkills(S, id) {
+  const h = S.heroes[id]; if (!h) return 0;
+  const n = Object.values(h.pts || {}).reduce((a, b) => a + b, 0);
+  h.sp = (h.sp || 0) + n; h.pts = {}; h.hide = [];
+  S.minions = (S.minions || []).filter(m => m.owner !== id); // summons came from those skills
+  clampHP(S); return n;
+}
+export function resetStats(S, id) {
+  const h = S.heroes[id]; if (!h) return 0;
+  const n = Object.values(h.stats || {}).reduce((a, b) => a + b, 0);
+  h.stp = (h.stp || 0) + n; h.stats = { str: 0, dex: 0, vit: 0, ene: 0 };
+  clampHP(S); return n;
+}
+export function changeClass(S, id, cls) {
+  const h = S.heroes[id]; if (!h || !CLASSES[cls] || clsOf(id) === cls) return null;
+  const nid = id.includes('#') ? `${cls}#${id.split('#')[1]}` : cls;
+  if (S.heroes[nid]) return null;
+  resetSkills(S, id); resetStats(S, id);
+  delete S.heroes[id]; S.heroes[nid] = h;
+  const ren = (a) => a.map(x => x === id ? nid : x);
+  S.party = ren(S.party); S.reserve = ren(S.reserve); if (S.lead === id) S.lead = nid;
+  if (id.includes('#')) delete HEROES[id];
+  registerMerc(S, nid);
+  // what the new class cannot use goes back to the bag; an empty hand gets the class's plain weapon
+  const out = [];
+  for (const [sl, g] of Object.entries(h.equip)) if (g && !canEquip(nid, g, S)) { addItem(S, g, 1); h.equip[sl] = null; out.push(g); }
+  if (!h.equip.R) { const C = CLASSES[cls]; h.equip.R = register(S, { b: `g_${C.wpn}1`, r: 0, il: 1, a: [] }); if (GEAR[h.equip.L]?.hands === 2 || !canEquip(nid, h.equip.R, S)) h.equip.R = null; }
+  clampHP(S);
+  return { id: nid, removed: out };
+}
 export function addEcho(S, id) {
   if (!S.echoes[id]) S.echoes[id] = { bond: 1, bexp: 0, star: 0 };
 }
