@@ -265,6 +265,11 @@ body.inbattle .tb-b { right: auto; left: 0; bottom: 0; width: 64px; height: 64px
 
 .pd-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; } .pd-row figure { margin: 0; text-align: center; } .pd-row img { width: 72px; height: 114px; image-rendering: pixelated; object-fit: contain; background: radial-gradient(circle at 50% 70%, rgba(255,255,255,0.12), transparent 70%); border-radius: 6px; } .pd-row figcaption { font-size: 11px; color: var(--dim); } .pd-row span { color: var(--dim); }
 
+.gi-sock { display: flex; align-items: center; gap: 4px; margin: 6px 0; flex-wrap: wrap; }
+.gi-sock i { width: 22px; height: 22px; border: 1px solid #8a7a5a; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-weight: bold; font-size: 13px; background: rgba(0,0,0,0.35); }
+.gi-sock i.em { border-style: dashed; border-color: #6a6a6a; }
+.gi-sock span { font-size: 12px; color: #c8b890; margin-left: 4px; }
+.r-bonus span { color: #ffb04a; font-size: 13px; }
 .gi-roll { margin: 6px 0; padding: 6px 8px; background: rgba(0,0,0,0.18); border-radius: 6px; font-size: 12px; }
 .gi-q { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; } .gi-q span { color: var(--dim); } .gi-q i { flex: 1; max-width: 160px; height: 6px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; } .gi-q b { display: block; height: 100%; } .gi-q em { font-style: normal; font-weight: bold; }
 .gi-rl { display: flex; gap: 8px; line-height: 1.5; } .gi-rl span { min-width: 104px; color: #c8d0e8; } .gi-rl b { min-width: 44px; } .gi-rl small { color: var(--dim); } .gi-rl.top b { color: #ffd86a; }

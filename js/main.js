@@ -240,7 +240,7 @@ class Game {
 
   // ---------------------------------------------------------------- moving between places
   // dungeon levels are laid out when you enter them; going out from the camp starts a fresh expedition
-  clearDungeons() { const dun = (k) => parseId(k) || parsePalace(k); for (const k of Object.keys(MAPS)) if (dun(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^(d\d_\d|p\d+)_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (dun(k)) delete this.S.explored[k]; }
+  clearDungeons() { this.S.heat = 0; const dun = (k) => parseId(k) || parsePalace(k); for (const k of Object.keys(MAPS)) if (dun(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^(d\d_\d|p\d+)_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (dun(k)) delete this.S.explored[k]; }
   ensureMap(to) {
     const pf = parsePalace(to); if (pf) { if (!MAPS[to]) { const def = genPalace(this.S, pf, this.S.seeds?.[to]); this.S.seeds = this.S.seeds || {}; this.S.seeds[to] = def.seed; } return; }
     const p = parseId(to); if (!p) return;

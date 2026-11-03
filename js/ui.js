@@ -6,7 +6,8 @@ import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N,
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
 import { STATE_N, STATE_DESC, REACTIONS, PAIRS, huntText, NEW_ECHOES } from './depth.js?v=1';
-import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken } from './loot.js?v=1';
+import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken, socketItem, insertRune } from './loot.js?v=1';
+import { RUNES, RUNEWORDS, runeColor, runeFx, matchRuneword, runewordsFor, runeStr, maxSockets, sockKind, RW_SLOT_N } from './runes.js?v=1';
 import { CLASSES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
 import { personSheet, battleSheet } from './pixel.js?v=1';
@@ -63,7 +64,7 @@ export class UI {
   hud() {
     const S = this.S; const e = $('#hudparty');
     e.innerHTML = S.party.map(id => { const h = S.heroes[id], st = heroStats(S, id); return `<div class="hp-mini"><img src="${portrait(id)}"><div><div class="bar"><i style="width:${h.hp / st.hp * 100}%"></i></div><div class="bar mp"><i style="width:${h.mp / st.mp * 100}%"></i></div></div></div>`; }).join('');
-    $('#hudgil').textContent = S.gil + ' G';
+    $('#hudgil').textContent = S.gil + ' G' + (S.heat ? `　🔥${S.heat}` : '');
   }
 
   // ---------------------------------------------------------------- dialogue
@@ -316,11 +317,93 @@ export class UI {
     const teach = G.teach ? `<div class="gi-teach">✦ 可學會：<b>${SKILLS[G.teach].name}</b>（${SCHOOL_N[SKILLS[G.teach].school]}）${h ? (h.spells?.includes(G.teach) ? '　已學會' : `　AP ${h.ap?.[G.teach] || 0}/${G.ap}`) : `　需要 AP ${G.ap}`}<br><small>${SKILLS[G.teach].desc}</small></div>` : '';
     const pic = itemIcon(g, true);
     const ll = lootLines(G), lowLv = id && G.lvReq && this.S.heroes[id]?.lv < G.lvReq;
-    return `<div class="gi">${pic ? `<img class="gi-pic" src="${pic}">` : ''}<h4 style="color:${G.rarColor || '#fff'}">${G.name}</h4>${G.rarity >= 2 ? `<div class="gi-kind" style="color:${G.rarColor}">${G.baseName}</div>` : ''}<div class="gi-kind">${G.rarity != null ? RARITY[G.rarity].n + '・' : ''}${this.gearKind(G)}${G.il ? `　物品等級 ${G.il}` : ''}</div>${G.lvReq > 1 ? `<div class="gi-kind" style="color:${lowLv ? '#ff6a6a' : '#aaa'}">需要等級 ${G.lvReq}</div>` : ''}
-      ${this.rollHTML(G)}${ll.length ? `<div class="gi-fx">${ll.map(x => `<span style="color:#9ab8ff">${x}</span>`).join('')}</div>` : ''}${G.flavor ? `<div class="gi-flavor" style="color:#c8a060;font-style:italic">「${G.flavor}」</div>` : ''}${G.lootSet ? this.setHTML(G.lootSet, id) : ''}
+    return `<div class="gi">${pic ? `<img class="gi-pic" src="${pic}">` : ''}<h4 style="color:${G.rarColor || '#fff'}">${G.name}</h4>${G.rarity >= 2 || G.rw ? `<div class="gi-kind" style="color:${G.rarColor}">${G.baseName}</div>` : ''}<div class="gi-kind">${G.rarity != null ? (G.rw ? '符文之語' : RARITY[G.rarity].n) + '・' : ''}${this.gearKind(G)}${G.il ? `　物品等級 ${G.il}` : ''}</div>${G.lvReq > 1 ? `<div class="gi-kind" style="color:${lowLv ? '#ff6a6a' : '#aaa'}">需要等級 ${G.lvReq}</div>` : ''}
+      ${this.sockHTML(G)}${this.rollHTML(G)}${ll.length ? `<div class="gi-fx">${ll.map(x => `<span style="color:#9ab8ff">${x}</span>`).join('')}</div>` : ''}${G.flavor ? `<div class="gi-flavor" style="color:#c8a060;font-style:italic">「${G.flavor}」</div>` : ''}${G.lootSet ? this.setHTML(G.lootSet, id) : ''}
       <div>${this.gearLine(g).split('　')[0] || ''}</div>
       ${W ? `<div class="gi-trait">${W.trait}</div>` : ''}${G.type === 'shield' ? `<div class="gi-trait">盾：被物理攻擊時有機會完全格擋</div>` : ''}
       ${f.length ? `<div class="gi-fx">${f.map(x => `<span>${x}</span>`).join('')}</div>` : ''}${G.desc ? `<div>${G.desc}</div>` : ''}</div>`;
+  }
+  // sockets: the runes in them, and the empty ones
+  sockHTML(G) {
+    if (!G.sock) return '';
+    return `<div class="gi-sock">${Array.from({ length: G.sock }, (_, k) => G.runes[k] != null ? `<i style="color:${runeColor(G.runes[k])};border-color:${runeColor(G.runes[k])}">${RUNES[G.runes[k]].ch}</i>` : '<i class="em"></i>').join('')}<span>${G.rw ? '符文之語' : `${G.runes.length}/${G.sock} 孔`}</span></div>`;
+  }
+  // a list of powers (stats and effects) in words
+  powText(p) {
+    const o = [], N = { atk: '攻擊', def: '防禦', mag: '魔力', spr: '精神', spd: '速度', hp: 'HP', mp: 'MP' };
+    if (p.ed) o.push(`攻擊強化 +${p.ed}%`); if (p.edef) o.push(`防禦強化 +${p.edef}%`);
+    for (const k in N) if (p[k]) o.push(`${N[k]} +${p[k]}`); if (p.evade) o.push(`閃避 +${p.evade}%`);
+    const fx = { ...(p.fx || {}) }; if (p.res) fx.res = { ...(fx.res || {}), ...p.res };
+    return o.concat(lootLines({ fx }), fxText(fx));
+  }
+  // the runewords a socketed piece could still become
+  rwHint(uid) {
+    const sp = this.S.loot?.[uid]; if (!sp?.so) return ''; const B = GEAR[sp.b], may = runewordsFor(B, sp.rn || [], sp.so);
+    return may.length ? `<div class="gi-teach" style="color:#e0c080">可以做成：<br>${may.map(w => `<b>${w.name}</b>　${runeStr(w.runes)}（Lv ${w.lv}）`).join('<br>')}</div>` : `<div class="gi-kind">${sp.so}孔的${RW_SLOT_N[sockKind(B)] || ''}，照現在的符文已經做不成符文之語</div>`;
+  }
+  rwHTML(w) {
+    return `<div class="gi"><h4 style="color:#e0c080">${w.name}</h4><div class="gi-kind">符文之語・${RW_SLOT_N[w.slot]}・${w.runes.length}孔　需要等級 ${w.lv}</div><div class="gi-sock">${w.runes.map(i => `<i style="color:${runeColor(i)};border-color:${runeColor(i)}">${RUNES[i].ch}</i>`).join('')}<span>依這個順序鑲進 ${w.runes.length} 孔的普通${RW_SLOT_N[w.slot]}</span></div><div class="gi-fx">${this.powText(w.p).map(x => `<span>${x}</span>`).join('')}</div><div class="gi-flavor" style="color:#c8a060;font-style:italic">「${w.flavor}」</div><div class="gi-kind">數值會在 ±20% 內浮動</div></div>`;
+  }
+  runeHTML(r, B) {
+    const line = (p) => this.powText(p).join('、');
+    return `<div class="gi"><h4 style="color:${runeColor(r.i)}">${r.name}</h4><div class="gi-kind">第 ${r.i + 1} 級符文・需要等級 ${r.lv}　持有 ${this.S.items[r.id] || 0}</div>${B ? `<div class="gi-fx"><span>${line(runeFx(r.i, B))}</span></div>` : `<div>武器：${line(r.w)}</div><div>防具、盾：${line(r.a)}</div>`}<div class="gi-kind">用在：${Object.values(RUNEWORDS).filter(w => w.runes.includes(r.i)).map(w => w.name).join('、') || '—'}</div></div>`;
+  }
+  // the smith's runes: sockets, runes and runewords
+  async runeMenu(owned, parse) {
+    const S = this.S, runesOwned = () => RUNES.filter(r => S.items[r.id] > 0);
+    const pieces = (f) => { const seen = new Set(), out = []; for (const o of owned()) { const uid = parse(o.id).base, sp = S.loot?.[uid]; if (!sp || seen.has(uid) || !f(sp)) continue; seen.add(uid); out.push({ ...o, uid }); } return out; };
+    const where = (o) => o.where ? HEROES[o.where[0]].name + '裝備中' : '背包';
+    for (;;) {
+      const n = runesOwned().reduce((s, r) => s + S.items[r.id], 0);
+      const m = await this.choose([{ label: '鑲嵌符文', sub: `符文 ${n} 顆` }, { label: '打孔', sub: '普通裝備' }, { label: '合成符文', sub: '3 顆 → 高一級' }, { label: '符文之語一覽', sub: Object.keys(RUNEWORDS).length + ' 種' }, { label: '我的符文', sub: n + ' 顆' }], { title: `符文　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>符文</b>從怪物身上掉落，精英、首領和死王宮殿掉得多，也比較容易掉高級符文。</p><p>白色（普通）裝備有時會帶孔掉落，也可以在這裡打孔。把符文依序鑲進孔裡，每顆符文都有自己的效果；<b style="color:#e0c080">正確的符文、正確的順序、剛好填滿正確種類的裝備</b>，就會變成符文之語。</p><p>鑲進去的符文拿不出來。</p>' });
+      if (m < 0) return;
+      if (m === 0) {
+        for (;;) {
+          const list = pieces((sp) => sp.r === 0 && sp.so && (sp.rn || []).length < sp.so);
+          if (!list.length) { await this.info('<p>沒有還有空孔的普通裝備。</p><p>白色裝備有時會帶孔掉落，名字後面會寫〔N孔〕；沒有孔的普通裝備可以在「打孔」打孔。</p>', '鑲嵌符文'); break; }
+          const i = await this.choose(list.map(o => ({ label: GEAR[o.id].name, sub: `${(S.loot[o.uid].rn || []).length}/${S.loot[o.uid].so}　${where(o)}` })), { title: '鑲嵌到哪一件？', info: (k) => this.gearHTML(list[k].id) + this.rwHint(list[k].uid) });
+          if (i < 0) break;
+          const o = list[i], sp = S.loot[o.uid], B = GEAR[sp.b], have = runesOwned();
+          if (!have.length) { this.toast('沒有符文'); break; }
+          const j = await this.choose(have.map(r => ({ label: `<span style="color:${runeColor(r.i)}">${r.name}</span>`, sub: '×' + S.items[r.id] })), { title: '鑲嵌哪一顆？', info: (k) => { const r = have[k], next = [...(sp.rn || []), r.i], w = matchRuneword(B, next, sp.so), may = runewordsFor(B, next, sp.so); return this.runeHTML(r, B) + (w ? `<div class="gi-god">完成符文之語「${w.name}」！</div>` : may.length ? `<div class="gi-kind" style="color:#e0c080">還可能做成：${may.map(x => x.name).join('、')}</div>` : `<div class="gi-kind">這樣排，不會成為任何符文之語</div>`); } });
+          if (j < 0) continue;
+          const r = have[j];
+          if (!await this.yesno(`把 ${r.name} 鑲進「${GEAR[o.id].name}」？
+鑲進去就拿不出來了。`)) continue;
+          addItem(S, r.id, -1); if (S.items[r.id] <= 0) delete S.items[r.id];
+          const w = insertRune(S, o.uid, r.i); this.G.audio.sfx('levelup');
+          if (w) await this.info(this.gearHTML(o.id), `符文之語「${w.name}」完成！`); else this.toast(`${r.name} 鑲好了`);
+        }
+      } else if (m === 1) {
+        for (;;) {
+          const list = pieces((sp) => sp.r === 0 && !sp.so && !sp.rn?.length && maxSockets(GEAR[sp.b], sp.il) > 0);
+          if (!list.length) { await this.info('<p>沒有可以打孔的普通裝備。</p><p>只有白色（普通）、還沒有孔的武器和防具可以打孔；飾品不行。</p>', '打孔'); break; }
+          const cost = (sp) => Math.round(300 + sp.il * sp.il * 3);
+          const i = await this.choose(list.map(o => { const sp = S.loot[o.uid]; return { label: GEAR[o.id].name, sub: `${maxSockets(GEAR[sp.b], sp.il)} 孔　${cost(sp)} G` }; }), { title: `打孔　<span class="gil">${S.gil} G</span>`, info: (k) => this.gearHTML(list[k].id) + `<div class="gi-kind">物品等級越高，能打的孔越多</div>` });
+          if (i < 0) break;
+          const o = list[i], sp = S.loot[o.uid], n = maxSockets(GEAR[sp.b], sp.il), c = cost(sp);
+          if (!await this.yesno(`幫「${GEAR[o.id].name}」打 ${n} 個孔？
+需要 ${c} G。`)) continue;
+          if (S.gil < c) { this.toast('錢不夠'); continue; }
+          S.gil -= c; socketItem(S, o.uid, n); this.G.audio.sfx('levelup'); this.toast(`${GEAR[o.id].name} 完成！`);
+        }
+      } else if (m === 2) {
+        for (;;) {
+          const list = RUNES.filter(r => r.i < RUNES.length - 1 && (S.items[r.id] || 0) >= 3), cost = (r) => (r.i + 1) * 150;
+          if (!list.length) { this.toast('需要 3 顆相同的符文'); break; }
+          const i = await this.choose(list.map(r => ({ label: `3 × <span style="color:${runeColor(r.i)}">${r.name}</span> → <span style="color:${runeColor(r.i + 1)}">${RUNES[r.i + 1].name}</span>`, sub: `${cost(r)} G　持有 ${S.items[r.id]}` })), { title: `合成符文　<span class="gil">${S.gil} G</span>`, info: (k) => this.runeHTML(RUNES[list[k].i + 1]) });
+          if (i < 0) break;
+          const r = list[i]; if (S.gil < cost(r)) { this.toast('錢不夠'); continue; }
+          S.gil -= cost(r); addItem(S, r.id, -3); if (S.items[r.id] <= 0) delete S.items[r.id]; addItem(S, RUNES[r.i + 1].id, 1); this.G.audio.sfx('levelup'); this.toast(`得到 ${RUNES[r.i + 1].name}`);
+        }
+      } else if (m === 3) {
+        const W = Object.values(RUNEWORDS).sort((a, b) => a.lv - b.lv);
+        await this.choose(W.map(w => ({ label: `<span style="color:#e0c080">${w.name}</span>`, sub: `${runeStr(w.runes)}　${RW_SLOT_N[w.slot]}` })), { title: '符文之語一覽', info: (k) => this.rwHTML(W[k]) });
+      } else {
+        const have = runesOwned(); if (!have.length) { this.toast('還沒有符文'); continue; }
+        await this.choose(have.map(r => ({ label: `<span style="color:${runeColor(r.i)}">${r.name}</span>`, sub: '×' + S.items[r.id] })), { title: '我的符文', info: (k) => this.runeHTML(have[k]) });
+      }
+    }
   }
   // the rolled numbers: how good the piece is, and each number against its range
   rollHTML(G) {
@@ -639,9 +722,10 @@ export class UI {
     const owned = () => { const out = []; for (const id of Object.keys(S.items)) if (S.items[id] > 0 && GEAR[id] && GEAR[id].tier != null && GEAR[id].tier <= maxTier) out.push({ id, where: null }); for (const h of Object.keys(S.heroes)) for (const sl of EQUIP_SLOTS) { const g = S.heroes[h].equip[sl]; if (g && GEAR[g] && GEAR[g].tier != null) out.push({ id: g, where: [h, sl] }); } return out; };
     const swap = (o, nid) => { if (o.where) S.heroes[o.where[0]].equip[o.where[1]] = nid; else { addItem(S, o.id, -1); if (S.items[o.id] <= 0) delete S.items[o.id]; addItem(S, nid, 1); } };
     for (;;) {
-      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
+      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#e0c080">符文</span>', sub: '孔・符文之語' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#e0c080">符文</b>：幫普通裝備打孔、鑲嵌符文，做出符文之語。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
       if (m < 0) return;
-      if (m === 2) { await this.awakenMenu(owned, parse); continue; }
+      if (m === 2) { await this.runeMenu(owned, parse); continue; }
+      if (m === 3) { await this.awakenMenu(owned, parse); continue; }
       for (;;) {
         const list = owned().filter(o => m === 0 ? parse(o.id).n < 5 : GEAR[o.id].slot !== 'acc');
         if (!list.length) { this.toast('沒有可以處理的裝備'); break; }

@@ -461,7 +461,7 @@ for (const [id, n, o, d, p] of [['i_cottage', '小屋', { tent: true }, '在存�
 { let k = 0; while (Object.keys(ITEMS).length < 500) { addI(`i_trx${k}`, { name: ['失落的', '神秘的', '閃亮的', '古老的', '奇妙的'][k % 5] + ['懷錶', '硬幣', '羽飾', '雕像', '戒指', '石碑', '鈴鐺', '面具'][Math.floor(k / 5) % 8], price: 0, sell: 200 + k * 20, mat: true, desc: '收藏家會高價收購的珍品', cat: 'treasure' }); k++; } }
 for (const id of Object.keys(ITEMS)) if (!ITEMS[id].cat) { const I = ITEMS[id]; I.cat = I.key ? 'key' : I.mat ? 'mat' : I.use?.dmg ? 'throw' : I.use?.revive ? 'revive' : I.use?.cure ? 'cure' : I.use?.tent || I.use?.escape ? 'tool' : 'heal'; }
 export const ITEM_COUNT = Object.keys(ITEMS).length;
-export const ITEM_CATS = { heal: '回復', cure: '治療', revive: '復活', throw: '投擲', buff: '強化', scroll: '卷軸', food: '料理', seed: '成長', tool: '道具', mat: '素材', treasure: '寶物', key: '重要' };
+export const ITEM_CATS = { heal: '回復', cure: '治療', revive: '復活', throw: '投擲', buff: '強化', scroll: '卷軸', food: '料理', seed: '成長', tool: '道具', mat: '素材', treasure: '寶物', rune: '符文', key: '重要' };
 
 // ================================================================ enemies: family, battlefield traits and extra weaknesses
 const KIND = {
@@ -550,6 +550,9 @@ export function fxText(fx) {
   if (fx.burnAmp) o.push('燃燒傷害×2'); if (fx.spreadBurn) o.push('燃燒會蔓延'); if (fx.wetAll) o.push('水屬性讓全體濕潤'); if (fx.wetAmp) o.push(`濕潤的敵人受傷+${Math.round(fx.wetAmp * 100)}%`);
   if (fx.shockStun) o.push('感電必定暈眩'); if (fx.chainT) o.push('雷屬性連鎖'); if (fx.antiUndying) o.push('阻止不死復活'); if (fx.killHeal) o.push(`擊倒時回復${Math.round(fx.killHeal * 100)}%HP`);
   if (fx.dodgeCounter) o.push('閃避後反擊'); if (fx.blockUp) o.push(`格擋+${Math.round(fx.blockUp * 100)}%`); if (fx.dualcast) o.push(`${Math.round(fx.dualcast * 100)}%連續詠唱`); if (fx.revealHit) o.push('命中時發現弱點'); if (fx.markAmp) o.push(`印記傷害+${Math.round(fx.markAmp * 100)}%`);
+  if (fx.pierce) { const v = Object.entries(fx.pierce), e8 = ELS.every(e => fx.pierce[e] === v[0][1]) ? v[0][1] : 0; if (e8) o.push(`穿透所有屬性抗性${Math.round(e8 * 100)}%`); for (const [e, x] of v) if (!e8 || e === 'phys') o.push(`穿透${e === 'phys' ? '物理' : ELEM[e]}抗性${Math.round(x * 100)}%`); }
+  if (fx.proc) for (const [on, sk, lv, ch] of fx.proc) o.push(`${({ hit: '擊中時', struck: '被擊中時', kill: '擊倒敵人時', start: '戰鬥開始時' })[on]}${ch >= 1 ? '' : Math.round(ch * 100) + '%'}施放「${SKILLS[sk]?.name || sk} Lv${lv}」`);
+  if (fx.convict) o.push('光環：敵人的免疫失效、抗性降低'); if (fx.partyFirst) o.push('全隊先制');
   if (fx.enc) o.push(fx.enc < 0 ? `遇敵-${Math.round(-fx.enc * 100)}%` : `遇敵+${Math.round(fx.enc * 100)}%`);
   return o;
 }
