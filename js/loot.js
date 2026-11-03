@@ -18,6 +18,9 @@ export const RARITY = [
 const ELS = ['fire', 'ice', 'thunder', 'water', 'wind', 'earth', 'light', 'dark'];
 const rint = (a, b, r = Math.random) => a + Math.floor(r() * (b - a + 1));
 const pick = (arr, r = Math.random) => arr[Math.floor(r() * arr.length)];
+// a roll u in [0, 1] picks a whole number in [a, b]; u = 1 is always the top of the range
+const pin = ([a, b], u) => a + Math.min(b - a, Math.floor(u * (b - a + 1)));
+const r3 = (x) => Math.round(x * 1000) / 1000;
 
 // ---------------------------------------------------------------- base types
 // every base piece made by content.js: weapons, shields, armour in three styles, and jewellery
@@ -48,7 +51,7 @@ const ilvlOfTier = (t) => t * 8 + 1; // a base of tier t drops from item level 8
 // ---------------------------------------------------------------- affixes
 // [id, prefix?, categories, tiers: [minIlvl, name, roll(r)]]; roll gives stats (hp, atk, ...) and fx
 const T6 = [1, 10, 20, 32, 46, 62];
-const tiered = (id, pre, cats, names, ranges, make) => [id, pre, cats, names.map((n, i) => [T6[i], n, (r) => make(rint(ranges[i][0], ranges[i][1], r), i)])];
+const tiered = (id, pre, cats, names, ranges, make) => [id, pre, cats, names.map((n, i) => [T6[i], n, (r, u) => make(pin(ranges[i], u), i), undefined, ranges[i]])];
 const AFFIXES = [
   // prefixes
   tiered('ed', 1, 'W', ['結實的', '鋒利的', '殘酷的', '兇猛的', '野蠻的', '毀滅的'], [[15, 25], [26, 40], [41, 60], [61, 80], [81, 110], [111, 150]], (v) => ({ ed: v })),
@@ -94,32 +97,32 @@ const TREE_KEYS = Object.entries(TREES).flatMap(([c, ts]) => ts.map((t, i) => `$
 export const treeLabel = (key) => { const [c, i] = key.split('_'); return `${CLASSES[c]?.name}・${TREES[c]?.[+i]?.name}`; };
 const MO = true, res8 = (v) => Object.fromEntries(ELS.map(e => [e, v]));
 const END = {
-  ed: [[72, '殘暴的', [151, 200]], [82, '破滅的', [201, 260], MO], [90, '神罰的', [261, 320], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ ed: rint(g[0], g[1], r) }), m]),
-  edef: [[72, '金剛的', [141, 180]], [82, '神盾的', [181, 230], MO], [90, '不滅的', [231, 300], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ edef: rint(g[0], g[1], r) }), m]),
-  atk: [[72, '殘殺的', [46, 60]], [85, '弒神的', [61, 80], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ atk: rint(g[0], g[1], r) }), m]),
-  mag: [[72, '大魔導的', [46, 60]], [85, '神諭的', [61, 80], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ mag: rint(g[0], g[1], r) }), m]),
-  mp: [[72, '星海的', [121, 170]], [85, '虛空的', [171, 230], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ mp: rint(g[0], g[1], r) }), m]),
-  resall: [[72, '萬象的', [23, 30]], [84, '神佑的', [31, 40], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ res: res8(rint(g[0], g[1], r)) }), m]),
-  leech: [[72, '血神的', [13, 16]], [86, '永生的', [17, 20], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { drain: rint(g[0], g[1], r) / 100 } }), m]),
-  mf: [[72, '命運的', [36, 50]], [86, '眾神寵愛的', [51, 70], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { mf: rint(g[0], g[1], r) } }), m]),
-  skill: [[74, '神匠的', [2, 2]], [88, '至高的', [3, 3], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { skillAll: rint(g[0], g[1], r) } }), m]),
-  hp: [[72, '・巨神', [221, 300]], [82, '・世界樹', [301, 380]], [90, '・永恆', [381, 460], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ hp: rint(g[0], g[1], r) }), m]),
-  str: [[72, '・天神之力', [31, 40]], [86, '・創世', [41, 52], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ atk: rint(g[0], g[1], r) }), m]),
-  spd: [[72, '・瞬影', [6, 6]], [86, '・時之神', [7, 8], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ spd: rint(g[0], g[1], r) }), m]),
-  crit: [[72, '・斬首', [21, 28]], [86, '・死神', [29, 35], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { crit: rint(g[0], g[1], r) / 100 } }), m]),
-  dbl: [[72, '・千刃', [33, 42]], [86, '・無盡', [43, 52], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { dbl: rint(g[0], g[1], r) / 100 } }), m]),
-  hpP: [[74, '・不死', [19, 25]], [88, '・神軀', [26, 32], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { hpP: rint(g[0], g[1], r) / 100 } }), m]),
-  mpreg: [[74, '・魔神', [5, 7], MO]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { mpregen: rint(g[0], g[1], r) / 100 } }), m]),
-  block: [[74, '・神盾', [19, 25]]].map(([l, n, g, m]) => [l, n, (r) => ({ fx: { blockUp: rint(g[0], g[1], r) / 100 } }), m]),
+  ed: [[72, '殘暴的', [151, 200]], [82, '破滅的', [201, 260], MO], [90, '神罰的', [261, 320], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ ed: pin(g, u) }), m, g]),
+  edef: [[72, '金剛的', [141, 180]], [82, '神盾的', [181, 230], MO], [90, '不滅的', [231, 300], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ edef: pin(g, u) }), m, g]),
+  atk: [[72, '殘殺的', [46, 60]], [85, '弒神的', [61, 80], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ atk: pin(g, u) }), m, g]),
+  mag: [[72, '大魔導的', [46, 60]], [85, '神諭的', [61, 80], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ mag: pin(g, u) }), m, g]),
+  mp: [[72, '星海的', [121, 170]], [85, '虛空的', [171, 230], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ mp: pin(g, u) }), m, g]),
+  resall: [[72, '萬象的', [23, 30]], [84, '神佑的', [31, 40], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ res: res8(pin(g, u)) }), m, g]),
+  leech: [[72, '血神的', [13, 16]], [86, '永生的', [17, 20], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { drain: pin(g, u) / 100 } }), m, g]),
+  mf: [[72, '命運的', [36, 50]], [86, '眾神寵愛的', [51, 70], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { mf: pin(g, u) } }), m, g]),
+  skill: [[74, '神匠的', [2, 2]], [88, '至高的', [3, 3], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { skillAll: pin(g, u) } }), m, g]),
+  hp: [[72, '・巨神', [221, 300]], [82, '・世界樹', [301, 380]], [90, '・永恆', [381, 460], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ hp: pin(g, u) }), m, g]),
+  str: [[72, '・天神之力', [31, 40]], [86, '・創世', [41, 52], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ atk: pin(g, u) }), m, g]),
+  spd: [[72, '・瞬影', [6, 6]], [86, '・時之神', [7, 8], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ spd: pin(g, u) }), m, g]),
+  crit: [[72, '・斬首', [21, 28]], [86, '・死神', [29, 35], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { crit: pin(g, u) / 100 } }), m, g]),
+  dbl: [[72, '・千刃', [33, 42]], [86, '・無盡', [43, 52], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { dbl: pin(g, u) / 100 } }), m, g]),
+  hpP: [[74, '・不死', [19, 25]], [88, '・神軀', [26, 32], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { hpP: pin(g, u) / 100 } }), m, g]),
+  mpreg: [[74, '・魔神', [5, 7], MO]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { mpregen: pin(g, u) / 100 } }), m, g]),
+  block: [[74, '・神盾', [19, 25]]].map(([l, n, g, m]) => [l, n, (r, u) => ({ fx: { blockUp: pin(g, u) / 100 } }), m, g]),
 };
 for (const [id, tiers] of Object.entries(END)) { const A = AFFIXES.find(a => a.id === id); if (A) A.tiers.push(...tiers); }
-for (const c of Object.keys(CLASSES)) { const A = AFFIXES.find(a => a.id === 'cls' + c); if (A) A.tiers.push([72, CLASSES[c].name + '神匠的', (r) => ({ fx: { skillCls: { [c]: 3 } } })], [88, CLASSES[c].name + '傳說的', (r) => ({ fx: { skillCls: { [c]: rint(3, 4, r) } } }), MO]); }
+for (const c of Object.keys(CLASSES)) { const A = AFFIXES.find(a => a.id === 'cls' + c); if (A) A.tiers.push([72, CLASSES[c].name + '神匠的', (r) => ({ fx: { skillCls: { [c]: 3 } } })], [88, CLASSES[c].name + '傳說的', (r, u) => ({ fx: { skillCls: { [c]: pin([3, 4], u) } } }), MO, [3, 4]]); }
 // +skills to one skill tree, like "+3 to Fire Skills": named after the tree it rolled
-AFFIXES.push({ id: 'tree', pre: true, cats: 'WJAS', tiers: [[18, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: 1 } } })], [44, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: rint(1, 2, r) } } })], [70, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: rint(2, 3, r) } } })], [86, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: rint(3, 4, r) } } }), MO]] });
+AFFIXES.push({ id: 'tree', pre: true, cats: 'WJAS', tiers: [[18, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: 1 } } })], [44, '', (r, u) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: pin([1, 2], u) } } }), undefined, [1, 2]], [70, '', (r, u) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: pin([2, 3], u) } } }), undefined, [2, 3]], [86, '', (r, u) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: pin([3, 4], u) } } }), MO, [3, 4]]] });
 const AFFIX_BY = Object.fromEntries(AFFIXES.map(a => [a.id, a]));
 export const AFFIX_COUNT = AFFIXES.reduce((s, a) => s + a.tiers.length, 0);
 
-function rollAffix(cat, ilvl, pre, taken, r, rar = 1) {
+function rollAffix(cat, ilvl, pre, taken, r, rar = 1, perfect = false) {
   const fits = (t) => t[0] <= ilvl && (!t[3] || rar === 1);
   const pool = AFFIXES.filter(a => a.pre === pre && a.cats.includes(cat) && !taken.has(a.id) && a.tiers.some(fits));
   if (!pool.length) return null;
@@ -127,7 +130,8 @@ function rollAffix(cat, ilvl, pre, taken, r, rar = 1) {
   // higher tiers are rarer: weight the best few allowed
   const ti = Math.max(0, ok.length - 1 - Math.floor(Math.pow(r(), 0.6) * Math.min(3, ok.length)));
   const T = ok[ti]; taken.add(A.id);
-  return [A.id, A.tiers.indexOf(T), T[2](r)];
+  const u = perfect ? 1 : r3(r()); // where in the tier's range the value lands (kept, so the tooltip can show it)
+  return [A.id, A.tiers.indexOf(T), T[2](r, u), u];
 }
 
 // ---------------------------------------------------------------- uniques
@@ -252,8 +256,9 @@ export function rollItem(S, ilvl, o = {}, r = Math.random) {
     else rar = 0;
     if (o.minRarity) rar = Math.max(rar, o.minRarity);
   }
-  if (rar === 3) { const all = Object.values(UNIQUES).filter(u => u.lv <= ilvl + 4), near = all.filter(u => u.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const u = pick(pool, r); return register(S, { b: baseFor(u.base, u.tier, Math.max(ilvl, ilvlOfTier(u.tier)), r), r: 3, il: ilvl, u: u.id }); } rar = 2; }
-  if (rar === 4) { const all = Object.values(SET_ITEMS).filter(p => p.lv <= ilvl + 4), near = all.filter(p => p.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const p = pick(pool, r); return register(S, { b: baseFor(p.base, Math.min(9, Math.floor(p.lv / 9)), Math.max(ilvl, p.lv), r), r: 4, il: ilvl, s: p.id }); } rar = 2; }
+  const pf = o.perfect ?? r() < 0.004 * (o.quality || 1); // a perfect piece: every number at the top of its range
+  if (rar === 3) { const all = Object.values(UNIQUES).filter(u => u.lv <= ilvl + 4), near = all.filter(u => u.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const u = pick(pool, r); return register(S, { b: baseFor(u.base, u.tier, Math.max(ilvl, ilvlOfTier(u.tier)), r), r: 3, il: ilvl, u: u.id, ...(pf ? { pf: 1 } : {}) }); } rar = 2; }
+  if (rar === 4) { const all = Object.values(SET_ITEMS).filter(p => p.lv <= ilvl + 4), near = all.filter(p => p.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const p = pick(pool, r); return register(S, { b: baseFor(p.base, Math.min(9, Math.floor(p.lv / 9)), Math.max(ilvl, p.lv), r), r: 4, il: ilvl, s: p.id, ...(pf ? { pf: 1 } : {}) }); } rar = 2; }
   // a base piece the item level allows (jewellery only comes magic or better)
   const maxT = Math.max(0, Math.min(9, Math.floor((ilvl - 1) / 8))), tt = Math.max(0, maxT - (r() < 0.65 ? 0 : 1)); // mostly the best base the level allows
   let pool = BASES.filter(b => GEAR[b].tier === tt || GEAR[b].slot === 'acc' && GEAR[b].tier <= tt);
@@ -261,9 +266,9 @@ export function rollItem(S, ilvl, o = {}, r = Math.random) {
   if (rar === 0) pool = pool.filter(b => GEAR[b].slot !== 'acc');
   if (!pool.length) pool = BASES.filter(b => GEAR[b].tier === 0);
   const b = pick(pool, r), cat = catOf(GEAR[b]), taken = new Set(), a = [];
-  if (rar === 1) { const np = r() < 0.6 ? 1 : 0, ns = np && r() < 0.5 ? 0 : 1; for (let i = 0; i < np; i++) { const x = rollAffix(cat, ilvl, true, taken, r, 1); if (x) a.push(x); } for (let i = 0; i < ns || !a.length && i < 1; i++) { const x = rollAffix(cat, ilvl, false, taken, r, 1); if (x) a.push(x); } }
-  if (rar === 2) { const n = rint(ilvl >= 70 ? 4 : 3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r, 2); if (x) { a.push(x); if (want) pre++; else suf++; } } }
-  const spec = { b, r: rar, il: ilvl, a };
+  if (rar === 1) { const np = r() < 0.6 ? 1 : 0, ns = np && r() < 0.5 ? 0 : 1; for (let i = 0; i < np; i++) { const x = rollAffix(cat, ilvl, true, taken, r, 1, pf); if (x) a.push(x); } for (let i = 0; i < ns || !a.length && i < 1; i++) { const x = rollAffix(cat, ilvl, false, taken, r, 1, pf); if (x) a.push(x); } }
+  if (rar === 2) { const n = rint(ilvl >= 70 ? 4 : 3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r, 2, pf); if (x) { a.push(x); if (want) pre++; else suf++; } } }
+  const spec = { b, r: rar, il: ilvl, a, ...(pf ? { pf: 1 } : {}) };
   if (rar === 2) spec.n = rareName(r);
   if (rar === 0 && r() < 0.15) spec.q = rint(5, 15, r); // superior
   return register(S, spec);
@@ -275,6 +280,7 @@ const rareName = (r) => pick(RARE_A, r) + pick(RARE_B, r);
 // put a spec into the save and the GEAR table
 export function register(S, spec) {
   const uid = spec.uid || newUid(S); spec.uid = uid;
+  if (spec.bu == null) { spec.bu = spec.pf ? 1 : r3(Math.random()); spec.v = []; } // a new piece: its base and its powers get rolled in build()
   S.loot = S.loot || {}; S.loot[uid] = spec;
   GEAR[uid] = build(spec);
   return uid;
@@ -283,6 +289,36 @@ export function restoreLoot(S) { for (const [uid, spec] of Object.entries(S.loot
 export function dropLoot(S, uid) { delete S.loot?.[uid]; }
 
 const STATK = ['hp', 'mp', 'atk', 'def', 'mag', 'spr', 'spd'];
+// ---------------------------------------------------------------- rolled numbers
+// Like the old games, every number on a piece is rolled: the base stats within 10%, a unique's or set piece's powers
+// within 20% of their listed value, and affixes within their tier. Each roll is kept as [key, value, worst, best, step, steps].
+// A piece with every roll at its top step is a perfect one.
+const ROLL_TOP = ['ed', 'edef', 'hp', 'mp', 'atk', 'def', 'mag', 'spr', 'spd', 'evade'];
+const ROLL_FX = new Set(['crit', 'dbl', 'drain', 'mpdrain', 'mf', 'gil', 'exp', 'blockUp', 'mblock', 'evade', 'thorns', 'counter', 'first', 'lowhp', 'brk', 'dualcast', 'killHeal', 'healup', 'mpregen', 'hpP', 'mpcost', 'drop', 'steal']);
+const ROLL_NEST = ['elUp', 'onHit', 'slay'];
+const fix2 = (x) => Math.round(x * 100) / 100;
+// the range of a listed value v, give or take k, and where roll u lands in it
+function rollV(v, k, u, slay) {
+  if (slay) { const x = rollV(v - 1, k, u); x[0] = fix2(x[0] + 1); x[1] = fix2(x[1] + 1); x[2] = fix2(x[2] + 1); return x; }
+  const st = Number.isInteger(v) ? 1 : 0.01, w = fix2(Math.round(v * (1 - k) / st) * st), b = fix2(Math.round(v * (1 + k) / st) * st);
+  const n = Math.round(Math.abs(b - w) / st), i = Math.min(n, Math.floor(u * (n + 1)));
+  return [fix2(w + Math.sign(b - w) * i * st), w, b, i, n];
+}
+function rollPowers(p, U, out, k = 0.2) {
+  if (!p) return p;
+  const q = { ...p }, one = (key, v, slay) => { const [x, w, b, i, n] = rollV(v, k, U(), slay); if (n) out.push([key, x, w, b, i, n]); return x; };
+  for (const key of ROLL_TOP) if (typeof q[key] === 'number' && q[key]) q[key] = one(key, q[key]);
+  if (q.res) { q.res = { ...q.res }; for (const e of Object.keys(q.res)) q.res[e] = one('res.' + e, q.res[e]); }
+  if (q.fx) {
+    const f = q.fx = { ...q.fx };
+    for (const key of Object.keys(f)) {
+      if (ROLL_FX.has(key) && typeof f[key] === 'number' && f[key] && f[key] < 1 || key === 'mf' && f[key]) f[key] = one('fx.' + key, f[key]);
+      else if (ROLL_NEST.includes(key) && f[key] && typeof f[key] === 'object') { f[key] = { ...f[key] }; for (const e of Object.keys(f[key])) f[key][e] = one(key + '.' + e, f[key][e], key === 'slay'); }
+      else if (key === 'res' && f.res) { f.res = { ...f.res }; for (const e of Object.keys(f.res)) f.res[e] = one('res.' + e, f.res[e]); }
+    }
+  }
+  return q;
+}
 const TREES_N = (p) => { const k = Object.keys(p.fx?.skillTree || {})[0]; return k ? TREES[k.split('_')[0]]?.[+k.split('_')[1]]?.name || '' : ''; };
 function apply(g, p) {
   if (!p) return;
@@ -300,16 +336,28 @@ export function build(spec) {
   const B = GEAR[spec.b]; if (!B) return { name: '???', slot: 'acc', tier: 0, price: 1 };
   const g = { ...B, fx: { ...(B.fx || {}) }, base: spec.b, baseName: B.name, rarity: spec.r, il: spec.il, uid: spec.uid, loot: true };
   delete g.teach; delete g.ap;
+  // the rolls: pieces from before rolls existed have none, and keep the middle of every range
+  const rolls = g.rolls = [], old = spec.bu == null, V = spec.v || [];
+  let vi = 0; const U = () => spec.pf ? 1 : old ? 0.5 : (V[vi] ??= r3(Math.random()), V[vi++]);
+  const bu = spec.pf ? 1 : old ? 0.5 : spec.bu;
+  for (const k of ['atk', 'def', 'mag', 'spr', 'hp', 'mp']) if (B[k] > 0 && !old) { const [x, w, b, i, n] = rollV(B[k], 0.1, bu); g[k] = x; if (n) rolls.push(['base.' + k, x, w, b, i, n]); }
   if (spec.q) { if (g.atk) g.atk = Math.round(g.atk * (1 + spec.q / 100)); if (g.def) g.def = Math.round(g.def * (1 + spec.q / 100)); }
   let pre = '', suf = '';
-  for (const [aid, ti, p] of spec.a || []) { const A = AFFIX_BY[aid]; apply(g, p); if (A && spec.r === 1) { if (aid === 'tree') pre = TREES_N(p) + '的'; else if (A.pre) pre = A.tiers[ti]?.[1] || ''; else suf = A.tiers[ti]?.[1] || ''; } }
-  if (spec.u) { const u = UNIQUES[spec.u]; apply(g, u.p); g.name = u.name; g.flavor = u.flavor; g.lvReq = u.lv; g.uniq = spec.u; }
-  else if (spec.s) { const p = SET_ITEMS[spec.s]; apply(g, p.p); g.name = p.name; g.lootSet = p.set; g.lvReq = p.lv; g.setPiece = spec.s; }
+  for (const [aid, ti, p, u] of spec.a || []) { const A = AFFIX_BY[aid], rg = A?.tiers[ti]?.[4]; if (u != null && rg && rg[1] > rg[0]) rolls.push(['aff.' + aid, pin(rg, u), rg[0], rg[1], pin(rg, u) - rg[0], rg[1] - rg[0]]); apply(g, p); if (A && spec.r === 1) { if (aid === 'tree') pre = TREES_N(p) + '的'; else if (A.pre) pre = A.tiers[ti]?.[1] || ''; else suf = A.tiers[ti]?.[1] || ''; } }
+  const RP = (p) => old ? p : rollPowers(p, U, rolls);
+  if (spec.u) { const u = UNIQUES[spec.u]; apply(g, RP(u.p)); g.name = u.name; g.flavor = u.flavor; g.lvReq = u.lv; g.uniq = spec.u; }
+  else if (spec.s) { const p = SET_ITEMS[spec.s]; apply(g, RP(p.p)); g.name = p.name; g.lootSet = p.set; g.lvReq = p.lv; g.setPiece = spec.s; }
   else if (spec.r === 2) { g.name = spec.n; g.lvReq = Math.max(1, Math.floor(spec.il * 0.7)); }
   else { g.name = (spec.q ? '精良的' : '') + pre + B.name + suf; g.lvReq = spec.r === 1 ? Math.max(1, Math.floor(spec.il * 0.6)) : Math.max(1, B.tier * 6); }
   g.lvReq = Math.min(90, Math.max(g.lvReq || 1, B.tier * 6 + (B.tier >= 8 ? (B.tier - 7) * 6 : 0)));
   g.color = undefined; g.rarColor = RARITY[spec.r].c;
-  g.price = Math.round((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10));
+  // how good the rolls are, 0..1; every one at the top makes a perfect piece (only magic or better counts)
+  g.qual = rolls.length ? rolls.reduce((s, x) => s + x[4] / x[5], 0) / rolls.length : null;
+  // every one at the top is a perfect piece; it is a god piece when that was a 1-in-100 shot or worse (a ring of +1-2 speed is not)
+  g.maxed = rolls.length > 0 && rolls.every(x => x[4] === x[5]);
+  g.godly = spec.r >= 1 && g.maxed && (spec.pf || rolls.reduce((p, x) => p * (x[5] + 1), 1) >= 100);
+  if (g.godly) g.name = '★' + g.name;
+  g.price = Math.round(((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10)) * (g.qual == null ? 1 : 0.8 + g.qual * 0.4) * (g.godly ? 3 : 1));
   return g;
 }
 
@@ -325,6 +373,31 @@ export function lootLines(g) {
   return o;
 }
 export const LOOT_FX_KEYS = ['skillAll', 'skillCls', 'res', 'mf'];
+const ROLL_N = { ed: ['攻擊強化', '%'], edef: ['防禦強化', '%'], hp: ['HP', ''], mp: ['MP', ''], atk: ['攻擊', ''], def: ['防禦', ''], mag: ['魔力', ''], spr: ['精神', ''], spd: ['速度', ''], evade: ['迴避', '%'],
+  crit: ['暴擊率', '%x'], dbl: ['連擊率', '%x'], drain: ['吸血', '%x'], mpdrain: ['吸魔', '%x'], mf: ['尋寶率', '%'], gil: ['金幣', '%x'], exp: ['經驗值', '%x'], blockUp: ['格擋率', '%x'], mblock: ['魔法格擋', '%x'], thorns: ['反傷', '%x'], counter: ['反擊率', '%x'], first: ['先手率', '%x'], lowhp: ['背水', '%x'], brk: ['破防', '%x'], dualcast: ['連續詠唱', '%x'], killHeal: ['擊殺回復', '%x'], healup: ['治療量', '%x'], mpregen: ['MP 回復', '%x'], hpP: ['HP', '%x'], mpcost: ['MP 消耗', '%x'], drop: ['掉寶率', '%x'], steal: ['偷竊率', '%x'],
+  resall: ['所有抗性', '%'], leech: ['吸血', '%'], mleech: ['吸魔', '%'], skill: ['所有技能', ''], str: ['攻擊', ''], mpreg: ['MP 回復', '%'], block: ['格擋率', '%'], heal: ['治療量', '%'], gold: ['金幣', '%'], tree: ['技能樹等級', ''] };
+// one tooltip line per rolled number: name, value and its range
+export function rollLines(g) {
+  return (g.rolls || []).map(([key, v, w, b, i, n]) => {
+    let [k1, k2] = key.split('.'), name, u = '', x = (y) => y;
+    if (k1 === 'aff') {
+      const c = /^(res|el|oh|slay|cls|im)(.+)$/.exec(k2);
+      if (ROLL_N[k2]) { [name, u] = ROLL_N[k2]; if (u === '%x') u = '%'; }
+      else if (c && c[1] === 'res') [name, u] = [RES_N[c[2]] + '抗性', '%'];
+      else if (c && c[1] === 'el') [name, u] = [RES_N[c[2]] + '屬性傷害', '%'];
+      else if (c && c[1] === 'oh') [name, u] = ['命中時' + (STATUS_N[c[2]] || c[2]), '%'];
+      else if (c && c[1] === 'slay') [name, u] = ['對' + (FAM_N[c[2]] || c[2]) + '傷害', '%'];
+      else if (c && c[1] === 'cls') [name, u] = [(CLASSES[c[2]]?.name || '') + '技能', ''];
+      else name = k2;
+    } else if (k1 === 'base') [name, u] = [(ROLL_N[k2]?.[0] || k2) + '（底材）', ''];
+    else if (k1 === 'res') [name, u] = [RES_N[k2] + '抗性', '%'];
+    else if (k1 === 'elUp') [name, u, x] = [RES_N[k2] + '屬性傷害', '%', (y) => Math.round(y * 100)];
+    else if (k1 === 'onHit') [name, u, x] = ['命中時' + (STATUS_N[k2] || k2), '%', (y) => Math.round(y * 100)];
+    else if (k1 === 'slay') [name, u, x] = ['對' + (FAM_N[k2] || k2) + '傷害', '%', (y) => Math.round((y - 1) * 100)];
+    else { const k = k1 === 'fx' ? k2 : k1; [name, u] = ROLL_N[k] || [k, '']; if (u === '%x') { u = '%'; x = (y) => Math.round(y * 100); } }
+    return { name, v: x(v) + u, lo: x(w), hi: x(b) + u, top: i === n, q: i / n };
+  });
+}
 
 // ---------------------------------------------------------------- gambling and shops
 export function gambleItem(S, ilvl, cat) {

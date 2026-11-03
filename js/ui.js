@@ -6,7 +6,7 @@ import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N,
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
 import { STATE_N, STATE_DESC, REACTIONS, PAIRS, huntText, NEW_ECHOES } from './depth.js?v=1';
-import { SETS, setBonusFx as setBonus, lootLines, RARITY } from './loot.js?v=1';
+import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines } from './loot.js?v=1';
 import { CLASSES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
 import { personSheet, battleSheet } from './pixel.js?v=1';
@@ -317,10 +317,16 @@ export class UI {
     const pic = itemIcon(g, true);
     const ll = lootLines(G), lowLv = id && G.lvReq && this.S.heroes[id]?.lv < G.lvReq;
     return `<div class="gi">${pic ? `<img class="gi-pic" src="${pic}">` : ''}<h4 style="color:${G.rarColor || '#fff'}">${G.name}</h4>${G.rarity >= 2 ? `<div class="gi-kind" style="color:${G.rarColor}">${G.baseName}</div>` : ''}<div class="gi-kind">${G.rarity != null ? RARITY[G.rarity].n + '・' : ''}${this.gearKind(G)}${G.il ? `　物品等級 ${G.il}` : ''}</div>${G.lvReq > 1 ? `<div class="gi-kind" style="color:${lowLv ? '#ff6a6a' : '#aaa'}">需要等級 ${G.lvReq}</div>` : ''}
-      ${ll.length ? `<div class="gi-fx">${ll.map(x => `<span style="color:#9ab8ff">${x}</span>`).join('')}</div>` : ''}${G.flavor ? `<div class="gi-flavor" style="color:#c8a060;font-style:italic">「${G.flavor}」</div>` : ''}${G.lootSet ? this.setHTML(G.lootSet, id) : ''}
+      ${this.rollHTML(G)}${ll.length ? `<div class="gi-fx">${ll.map(x => `<span style="color:#9ab8ff">${x}</span>`).join('')}</div>` : ''}${G.flavor ? `<div class="gi-flavor" style="color:#c8a060;font-style:italic">「${G.flavor}」</div>` : ''}${G.lootSet ? this.setHTML(G.lootSet, id) : ''}
       <div>${this.gearLine(g).split('　')[0] || ''}</div>
       ${W ? `<div class="gi-trait">${W.trait}</div>` : ''}${G.type === 'shield' ? `<div class="gi-trait">盾：被物理攻擊時有機會完全格擋</div>` : ''}
       ${f.length ? `<div class="gi-fx">${f.map(x => `<span>${x}</span>`).join('')}</div>` : ''}${G.desc ? `<div>${G.desc}</div>` : ''}</div>`;
+  }
+  // the rolled numbers: how good the piece is, and each number against its range
+  rollHTML(G) {
+    if (G.qual == null) return '';
+    const L = rollLines(G), pc = Math.round(G.qual * 100), col = G.godly ? '#ffd86a' : pc >= 80 ? '#8affa0' : pc >= 40 ? '#e8e8e8' : '#ff9a8a';
+    return `<div class="gi-roll">${G.godly ? '<div class="gi-god">★ 神裝：所有數值都是滿值 ★</div>' : G.maxed ? '<div class="gi-god" style="text-shadow:none;font-weight:normal">滿值</div>' : ''}<div class="gi-q"><span>品質</span><i><b style="width:${pc}%;background:${col}"></b></i><em style="color:${col}">${pc}%</em></div>${L.map(l => `<div class="gi-rl${l.top ? ' top' : ''}"><span>${l.name}</span><b>${l.v}</b><small>${l.lo}–${l.hi}</small></div>`).join('')}</div>`;
   }
   setHTML(sid, id) {
     const D = SETS[sid], have = id ? setBonus(EQUIP_SLOTS.map(sl => this.S.heroes[id].equip[sl]).filter(Boolean)).count[sid] || 0 : 0;
