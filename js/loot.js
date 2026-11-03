@@ -132,6 +132,7 @@ const procT = (list, ch) => [[24, [4, 8]], [44, [9, 14]], [66, [15, 20]], [86, [
 AFFIXES.push({ id: 'procw', pre: false, cats: 'W', tiers: procT(PROC_HIT, 0.1) }, { id: 'proca', pre: false, cats: 'AS', tiers: procT(PROC_STRUCK, 0.12) });
 const AFFIX_BY = Object.fromEntries(AFFIXES.map(a => [a.id, a]));
 export const AFFIX_COUNT = AFFIXES.reduce((s, a) => s + a.tiers.length, 0);
+export const AFFIX_LIST = AFFIXES;
 
 // can a class use this base at all (weapon type, shield, armour style)?
 export function canWear(c, b) {
@@ -428,6 +429,19 @@ export function build(spec) {
   g.price = Math.round(((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10)) * (g.qual == null ? 1 : 0.8 + g.qual * 0.4) * (g.godly ? 3 : 1) * (aw ? 1.5 : 1) * (RW ? 4 : 1)) + (spec.rn || []).reduce((s, i) => s + ITEMS[RUNES[i].id].price, 0);
   return g;
 }
+
+// ---------------------------------------------------------------- the codex: a piece as it drops at its own level, every number at its top
+export function previewGear(kind, id) {
+  const key = `_pv_${kind}_${id}`; if (GEAR[key]) return key;
+  let spec;
+  if (kind === 'u') { const u = UNIQUES[id]; spec = { b: baseFor(u.base, u.tier, Math.max(u.lv, ilvlOfTier(u.tier)), () => 0), r: 3, il: u.lv, u: id }; }
+  else if (kind === 's') { const p = SET_ITEMS[id], t = Math.min(9, Math.floor(p.lv / 9)); spec = { b: baseFor(p.base, t, Math.max(p.lv, ilvlOfTier(t)), () => 0), r: 4, il: p.lv, s: id }; }
+  else spec = { b: id, r: 0, il: ilvlOfTier(GEAR[id]?.tier || 0), a: [] };
+  Object.assign(spec, { uid: key, bu: 1, pf: 1, v: [] });
+  const g = build(spec); g.preview = true; g.godly = false; g.maxed = false; g.name = g.name.replace(/^★/, '');
+  GEAR[key] = g; return key;
+}
+export const baseKindOf = (b) => catOf(GEAR[b]);
 
 // ---------------------------------------------------------------- the tooltip text of an item
 const RES_N = { fire: '火焰', ice: '冰霜', thunder: '雷電', water: '水', wind: '風', earth: '大地', light: '神聖', dark: '暗黑' };

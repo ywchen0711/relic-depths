@@ -6,7 +6,7 @@ import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N,
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
 import { STATE_N, STATE_DESC, REACTIONS, PAIRS, huntText, NEW_ECHOES } from './depth.js?v=1';
-import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken, socketItem, insertRune } from './loot.js?v=1';
+import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken, socketItem, insertRune, UNIQUES, BASES, AFFIX_LIST, previewGear, canWear, treeLabel } from './loot.js?v=1';
 import { RUNES, RUNEWORDS, runeColor, runeFx, matchRuneword, runewordsFor, runeStr, maxSockets, sockKind, RW_SLOT_N } from './runes.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
@@ -135,7 +135,7 @@ export class UI {
     for (;;) {
       this.hud();
       const save = async () => { if (G.canSave()) { G.save(); this.toast('已存檔'); G.audio.sfx('save'); } else this.toast('這裡無法存檔（請到存檔水晶旁）'); };
-      const opts = [['狀態', () => this.statusHub()], ['技能樹', () => this.skillTreeMenu()], ['屬性點', () => this.statsMenu()], ['裝備', () => this.equipMenu()], ['背包', () => this.bagMenu()], ['道具', () => this.itemMenu()], ['地圖', 'map'], ['自動練功', 'grind'], ['怪物圖鑑', () => this.bestiaryMenu()], ['隊伍編成', () => this.formationMenu()], ['戰術手冊', () => this.tacticsMenu()], ['存檔', save], ['設定', () => this.settingsMenu()]];
+      const opts = [['狀態', () => this.statusHub()], ['技能樹', () => this.skillTreeMenu()], ['屬性點', () => this.statsMenu()], ['裝備', () => this.equipMenu()], ['背包', () => this.bagMenu()], ['道具', () => this.itemMenu()], ['地圖', 'map'], ['自動練功', 'grind'], ['怪物圖鑑', () => this.bestiaryMenu()], ['寶物圖鑑', () => this.codexMenu()], ['隊伍編成', () => this.formationMenu()], ['戰術手冊', () => this.tacticsMenu()], ['存檔', save], ['設定', () => this.settingsMenu()]];
       const i = await this.choose(opts.map(([l]) => ({ label: l })), { title: `${G.mapName()}　<span class="gil">${S.gil} G</span>　<span class="tm">${fmtTime(S.time)}</span>`, info: this.partySummary(), start, cls: 'mainmenu' });
       start = Math.max(0, i);
       if (i < 0 || !opts[i][1]) break;
@@ -409,7 +409,7 @@ export class UI {
   rollHTML(G) {
     if (G.qual == null) return '';
     const L = rollLines(G), pc = Math.round(G.qual * 100), col = G.godly ? '#ffd86a' : pc >= 80 ? '#8affa0' : pc >= 40 ? '#e8e8e8' : '#ff9a8a';
-    return `<div class="gi-roll">${G.awake ? `<div class="gi-god">✦ 已覺醒：Lv ${G.awake} 的力量</div>` : ''}${G.godly ? '<div class="gi-god">★ 神裝：所有數值都是滿值 ★</div>' : G.maxed ? '<div class="gi-god" style="text-shadow:none;font-weight:normal">滿值</div>' : ''}<div class="gi-q"><span>品質</span><i><b style="width:${pc}%;background:${col}"></b></i><em style="color:${col}">${pc}%</em></div>${L.map(l => `<div class="gi-rl${l.top ? ' top' : ''}"><span>${l.name}</span><b>${l.v}</b><small>${l.lo}–${l.hi}</small></div>`).join('')}</div>`;
+    return `<div class="gi-roll">${G.awake ? `<div class="gi-god">✦ 已覺醒：Lv ${G.awake} 的力量</div>` : ''}${G.godly ? '<div class="gi-god">★ 神裝：所有數值都是滿值 ★</div>' : G.maxed ? '<div class="gi-god" style="text-shadow:none;font-weight:normal">滿值</div>' : ''}${G.preview ? '<div class="gi-kind">每個數值都會在範圍內骰出，這裡顯示的是最高值</div>' : `<div class="gi-q"><span>品質</span><i><b style="width:${pc}%;background:${col}"></b></i><em style="color:${col}">${pc}%</em></div>`}${L.map(l => `<div class="gi-rl${l.top ? ' top' : ''}"><span>${l.name}</span><b>${l.v}</b><small>${l.lo}–${l.hi}</small></div>`).join('')}</div>`;
   }
   setHTML(sid, id) {
     const D = SETS[sid], have = id ? setBonus(EQUIP_SLOTS.map(sl => this.S.heroes[id].equip[sl]).filter(Boolean)).count[sid] || 0 : 0;
@@ -608,6 +608,68 @@ export class UI {
       ['套裝', `<div class="gi"><h4>同一套裝備穿越多件效果越強</h4>${Object.values(SETS).map(D => `<div class="gi-trait"><b>〔${D.name}〕</b>　${D.pieces.map(p => p[1]).join('、')}</div><div style="margin:0 0 6px 1em">2件：${D.d2}<br>4件：${D.d4}<br><small class="gi-kind">掉落：${D.fams.map(f => FAM_N[f]).join('、')}系的怪物</small></div>`).join('')}</div>`],
     ];
     await this.choose(pages.map(p => ({ label: p[0] })), { title: '戰術手冊', cls: 'items', info: (i) => pages[i][1] });
+  }
+  // the codex: every unique, set, runeword, rune, affix, base and item, with what it does
+  async codexMenu() {
+    const S = this.S, CL = Object.keys(CLASSES);
+    const wearers = (b) => { const W = CL.filter(c => canWear(c, b)); return `<div class="gi-kind">能裝備：${W.length === CL.length ? '所有職業' : W.map(c => CLASSES[c].name).join('、') || '—'}</div>`; };
+    const pv = (kind, id) => { const k = previewGear(kind, id); return this.gearHTML(k) + wearers(GEAR[k].base); };
+    const dropsOf = {}; for (const [eid, E] of Object.entries(ENEMIES)) for (const [d] of E.drops || []) (dropsOf[d] ||= []).push(eid);
+    const RN = { fire: '火焰', ice: '冰霜', thunder: '雷電', water: '水', wind: '風', earth: '大地', light: '神聖', dark: '暗黑' };
+    const cats = [
+      ['暗金', '#c8a060', async () => {
+        const list = Object.values(UNIQUES).sort((a, b) => a.lv - b.lv);
+        await this.choose(list.map(u => ({ label: `<span style="color:#c8a060">${u.name}</span>`, sub: `Lv ${u.lv}　${this.gearKind(GEAR[previewGear('u', u.id)])}` })), { title: `暗金　${list.length} 件`, cls: 'items', info: (k) => pv('u', list[k].id) });
+      }],
+      ['套裝', '#3ae06a', async () => {
+        const list = Object.values(SETS).sort((a, b) => a.lv - b.lv);
+        for (;;) {
+          const i = await this.choose(list.map(D => ({ label: `<span style="color:#3ae06a">${D.name}</span>`, sub: `Lv ${D.lv}　${D.pieces.length} 件` })), { title: `套裝　${list.length} 套`, cls: 'items', info: (k) => this.setHTML(list[k].id) });
+          if (i < 0) return;
+          const D = list[i];
+          await this.choose(D.pieces.map(p => ({ label: `<span style="color:#3ae06a">${SET_ITEMS[p].name}</span>`, sub: this.gearKind(GEAR[previewGear('s', p)]) })), { title: `〔${D.name}〕`, cls: 'items', info: (k) => pv('s', D.pieces[k]) });
+        }
+      }],
+      ['符文之語', '#e0c080', async () => {
+        const W = Object.values(RUNEWORDS).sort((a, b) => a.lv - b.lv);
+        await this.choose(W.map(w => ({ label: `<span style="color:#e0c080">${w.name}</span>`, sub: `${runeStr(w.runes)}　${RW_SLOT_N[w.slot]}` })), { title: `符文之語　${W.length} 種`, cls: 'items', info: (k) => this.rwHTML(W[k]) });
+      }],
+      ['符文', '#ffb07a', async () => {
+        await this.choose(RUNES.map(r => ({ label: `<span style="color:${runeColor(r.i)}">${r.name}</span>`, sub: `Lv ${r.lv}${S.items[r.id] ? '　持有 ' + S.items[r.id] : ''}` })), { title: `符文　${RUNES.length} 種`, cls: 'items', info: (k) => this.runeHTML(RUNES[k]) + '<div class="gi-kind">3 顆相同的符文可以在鐵匠合成高一級的符文</div>' });
+      }],
+      ['詞綴', '#7a9aff', async () => {
+        const CAT = { W: '武器', A: '防具', S: '盾', J: '飾品' };
+        const nameOf = (a) => a.id === 'tree' ? '＋某棵技能樹等級' : a.id.startsWith('proc') ? (a.id === 'procw' ? '擊中時觸發技能' : '被擊中時觸發技能') : (a.tiers.find(t => t[1])?.[1] || a.id);
+        const what = (a, t) => { const p = t[2](() => 0, 1, a.id === 'tree' ? ['sorc_0'] : undefined); return this.powText(p).join('、').replace('元素法師・火系魔法', '某棵樹'); };
+        const list = AFFIX_LIST.slice().sort((a, b) => b.pre - a.pre);
+        await this.choose(list.map(a => ({ label: nameOf(a), sub: `${a.pre ? '前綴' : '後綴'}　${[...a.cats].map(c => CAT[c]).join('、')}` })), { title: `詞綴　${list.length} 種`, cls: 'items', info: (k) => { const a = list[k]; return `<div class="gi"><h4>${nameOf(a)}</h4><div class="gi-kind">${a.pre ? '前綴' : '後綴'}・出現在：${[...a.cats].map(c => CAT[c]).join('、')}</div>${a.tiers.map(t => `<div class="gi-rl"><span>${t[1] || '—'}</span><b>物品等級 ${t[0]}+</b><small>${what(a, t)}${t[4] && t[4][1] > t[4][0] ? `（${t[4][0]}～${t[4][1]}）` : ''}${t[3] ? '　只在魔法裝備' : ''}</small></div>`).join('')}<div class="gi-kind">物品等級越高，能出現的階越高；最高一階常常只出現在藍色魔法裝備上</div></div>`; } });
+      }],
+      ['底材', '#e8e8e8', async () => {
+        const groups = {}; for (const b of BASES) { const g = GEAR[b]; const k = g.slot === 'acc' ? (g.kind === 'ring' ? '戒指' : '護身符') : this.gearKind(g); (groups[k] ||= []).push(b); }
+        const keys = Object.keys(groups);
+        for (;;) {
+          const i = await this.choose(keys.map(k => ({ label: k, sub: groups[k].length + ' 種' })), { title: `底材　${BASES.length} 種`, cls: 'items' });
+          if (i < 0) return;
+          const list = groups[keys[i]].sort((a, b) => (GEAR[a].tier || 0) - (GEAR[b].tier || 0));
+          await this.choose(list.map(b => ({ label: GEAR[b].name, sub: `${GEAR[b].elite ? '菁英・' : ''}物品等級 ${(GEAR[b].tier || 0) * 8 + 1}+` })), { title: keys[i], cls: 'items', info: (k) => pv('b', list[k]) + `<div class="gi-kind">白色的這種底材最多 ${maxSockets(GEAR[list[k]], 99)} 孔</div>` });
+        }
+      }],
+      ['道具', '#8affb0', async () => {
+        const cs = Object.keys(ITEM_CATS).filter(c => c !== 'key' && Object.values(ITEMS).some(it => it.cat === c));
+        for (;;) {
+          const i = await this.choose(cs.map(c => ({ label: ITEM_CATS[c], sub: Object.values(ITEMS).filter(it => it.cat === c).length + ' 種' })), { title: '道具', cls: 'items' });
+          if (i < 0) return;
+          const list = Object.keys(ITEMS).filter(id => ITEMS[id].cat === cs[i]);
+          await this.choose(list.map(id => ({ label: ITEMS[id].name, sub: S.items[id] ? '持有 ' + S.items[id] : '' })), { title: ITEM_CATS[cs[i]], cls: 'items', info: (k) => { const id = list[k], it = ITEMS[id], from = (dropsOf[id] || []).filter(e => !e.endsWith('_trial')); return `<div class="gi"><h4>${it.name}</h4><div class="gi-kind">${ITEM_CATS[it.cat]}${it.price ? `　價值 ${it.price} G` : ''}${S.items[id] ? `　持有 ${S.items[id]}` : ''}</div><div>${it.desc || ''}</div>${from.length ? `<div class="gi-kind">掉落：${from.slice(0, 6).map(e => ENEMIES[e].name).join('、')}${from.length > 6 ? ` 等 ${from.length} 種` : ''}</div>` : ''}</div>`; } });
+        }
+      }],
+    ];
+    for (;;) {
+      const counts = [Object.keys(UNIQUES).length, Object.keys(SETS).length, Object.keys(RUNEWORDS).length, RUNES.length, AFFIX_LIST.length, BASES.length, Object.values(ITEMS).filter(it => it.cat && it.cat !== 'key').length];
+      const i = await this.choose(cats.map(([n, c], k) => ({ label: `<span style="color:${c}">${n}</span>`, sub: counts[k] + '' })), { title: '寶物圖鑑', cls: 'small' });
+      if (i < 0) return;
+      await cats[i][2]();
+    }
   }
   async bestiaryMenu() {
     const S = this.S, kills = S.kills || {}, seen = S.dropSeen || {};
