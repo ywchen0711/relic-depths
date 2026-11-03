@@ -527,6 +527,15 @@ export class UI {
       spend(); const { resetSkills } = await import('./party.js?v=1'); resetSkills(S, hid); this.G.audio.sfx('heal');
       await this.info(`<p>${HEROES[hid].name} 忘記了所有技能。</p><p>退回 <b>${n}</b> 點技能點數，現在共有 <b>${S.heroes[hid].sp}</b> 點。到選單的「技能」重新分配。</p>`, '遺忘之水'); return;
     }
+    if (I.use.restat) {
+      const hid = await this.heroPick('要讓誰吃下重生之果？', true); if (!hid) return;
+      const n = Object.values(S.heroes[hid].stats || {}).reduce((a, b) => a + b, 0);
+      if (!n) { this.toast(`${HEROES[hid].name} 還沒有分配屬性點數`); return; }
+      if (!await this.yesno(`讓 ${HEROES[hid].name} 吃下重生之果？
+分配過的 ${n} 點屬性點數會全部退回，可以重新分配。`)) return;
+      spend(); const { resetStats } = await import('./party.js?v=1'); resetStats(S, hid); this.G.audio.sfx('heal'); this.hud();
+      await this.info(`<p>${HEROES[hid].name} 的身體回到了最初的樣子。</p><p>退回 <b>${n}</b> 點屬性點數，現在共有 <b>${S.heroes[hid].stp}</b> 點。到選單的「屬性」重新分配。</p>`, '重生之果'); return;
+    }
     if (I.use.reclass) {
       const hid = await this.heroPick('要讓誰轉職？', true); if (!hid) return;
       const cur = clsOf(hid), opts = Object.keys(CLASSES).filter(c => c !== cur);

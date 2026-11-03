@@ -1422,6 +1422,7 @@ export class Battle {
       // the rare treasures: forgetting water and the book of a new class
       const tq = (boss ? 1 : u.rank === 2 ? 0.25 : u.rank === 1 ? 0.06 : 0.012) * rich;
       if (Math.random() < 0.08 * tq) { addItem(this.S, 'i_respec', 1); drops.push('i_respec'); }
+      if (Math.random() < 0.08 * tq) { addItem(this.S, 'i_restat', 1); drops.push('i_restat'); }
       if (Math.random() < 0.03 * tq) { addItem(this.S, 'i_reclass', 1); drops.push('i_reclass'); }
     }
     for (const uid of loot) addItem(this.S, uid, 1);
