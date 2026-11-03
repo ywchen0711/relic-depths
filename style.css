@@ -412,6 +412,9 @@ body.inbattle .grind-banner { top: auto; bottom: calc(10px + var(--sb)); left: c
 .sl-lab { color: var(--dim); font-size: 13px; width: 52px; }
 .sl-chip { padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.35); font-size: 13px; cursor: pointer; background: rgba(0, 0, 0, 0.2); }
 .sl-chip.on { background: #e8c050; color: #1a1430; border-color: #ffe8a0; text-shadow: none; font-weight: 700; }
+.sl-bar.foc { background: rgba(255, 255, 255, 0.07); border-radius: 6px; padding: 3px 0; }
+.sl-chip.cur { outline: 2px solid #8affff; outline-offset: 1px; }
+.sl-more { margin: 0 4px 6px; } .sl-more summary { cursor: pointer; padding: 4px 2px; color: #ffe8a0; } .sl-more[open] summary { margin-bottom: 6px; }
 .sl-box { width: 18px; height: 18px; flex: none; border: 2px solid rgba(255, 255, 255, 0.6); border-radius: 3px; font-size: 13px; line-height: 14px; text-align: center; color: #1a1430; text-shadow: none; }
 .sl-box.on { background: #8affa0; border-color: #d8ffe0; }
 .sl-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }

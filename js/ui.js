@@ -116,6 +116,7 @@ export class UI {
         if ((k === 'left' || k === 'right') && o.lr) { const r = o.lr(sel, k === 'left' ? -1 : 1); if (r === 'close') { off(); wrap.remove(); G.audio.sfx('move'); res(-2); return; } if (r) build(); else update(); }
         if (k === 'ok') { if (items[sel].disabled && !o.allowDisabled) { G.audio.sfx('error'); return; } done(sel); }
         if ((k === 'cancel' || k === 'menu') && o.cancel !== false) done(-1);
+        if (k === 'map' && o.onMap) { off(); wrap.remove(); G.audio.sfx('ok'); res(-3); } // the filter of a list
       });
       this.redraw = build;
       build();
@@ -439,13 +440,18 @@ export class UI {
       if (i === EQUIP_SLOTS.length + 1) { for (const sl of EQUIP_SLOTS) if (h.equip[sl] && !(sl === 'R' && !GEAR[h.equip.R]?.type)) equip(S, id, sl, null); this.G.audio.sfx('item'); continue; }
       if (i === EQUIP_SLOTS.length + 2) { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + 1) % all.length]; continue; }
       const slot = EQUIP_SLOTS[i];
-      const opts = Object.keys(S.items).filter(g => S.items[g] > 0 && GEAR[g] && slotFits(slot, g) && canEquip(id, g, S)).sort((a, b) => (GEAR[b].tier || 0) - (GEAR[a].tier || 0) || (GEAR[b].price || 0) - (GEAR[a].price || 0));
+      for (;;) { // the pieces for this slot; the filter brings you back here
+      const fe = this.gfEquip ||= { rar: 0, kind: 0, who: 'all', tr: [], sort: 0 }, ctx = { kind: false, who: false };
+      const fit = Object.keys(S.items).filter(g => S.items[g] > 0 && GEAR[g] && slotFits(slot, g) && canEquip(id, g, S));
+      const opts = fe.rar || fe.tr.length || fe.sort ? this.gearFilter(fit, fe, ctx) : fit.sort((a, b) => (GEAR[b].tier || 0) - (GEAR[a].tier || 0) || (GEAR[b].price || 0) - (GEAR[a].price || 0));
       // what this class can wear but not yet at this level: listed, greyed, with the level it needs
       const locked = Object.keys(S.items).filter(g => S.items[g] > 0 && GEAR[g] && slotFits(slot, g) && !canEquip(id, g, S) && canEquip(id, g)).sort((a, b) => (GEAR[a].lvReq || 0) - (GEAR[b].lvReq || 0));
-      if (!opts.length && !locked.length && !h.equip[slot]) { this.toast(`沒有${HEROES[id].name}能裝在「${SLOT_N[slot]}」的東西`); continue; }
-      const j = await this.choose([{ label: '（卸下）' }, ...opts.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: this.gearKind(GEAR[g]) + (S.items[g] > 1 ? ' ×' + S.items[g] : '') })), ...locked.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: `需要 Lv ${GEAR[g].lvReq}`, disabled: true }))], { title: SLOT_N[slot], info: (k) => k === 0 ? this.compareWith(id, slot, null) : k > opts.length ? this.gearHTML(locked[k - 1 - opts.length], id) : this.compareWith(id, slot, opts[k - 1], this.gearHTML(opts[k - 1], id)) });
-      if (j < 0) continue;
-      equip(S, id, slot, j === 0 ? null : opts[j - 1]); this.G.audio.sfx('item');
+      if (!fit.length && !locked.length && !h.equip[slot]) { this.toast(`沒有${HEROES[id].name}能裝在「${SLOT_N[slot]}」的東西`); break; }
+      const j = await this.choose([{ label: '🔍 篩選・排序', sub: `${this.filterSummary(fe, ctx)}　${opts.length}/${fit.length}` }, { label: '（卸下）' }, ...opts.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: this.gearKind(GEAR[g]) + (S.items[g] > 1 ? ' ×' + S.items[g] : '') })), ...locked.map(g => ({ icon: itemIcon(g), label: `<span style="color:${GEAR[g].rarColor || '#fff'}">${GEAR[g].name}</span>`, sub: `需要 Lv ${GEAR[g].lvReq}`, disabled: true }))], { title: SLOT_N[slot], start: opts.length ? 2 : 1, onMap: true, info: (k) => k === 0 ? '<div class="dim">選這一列（或按 M）改變篩選和排序</div>' : k === 1 ? this.compareWith(id, slot, null) : k > opts.length + 1 ? this.gearHTML(locked[k - 2 - opts.length], id) : this.compareWith(id, slot, opts[k - 2], this.gearHTML(opts[k - 2], id)) });
+      if (j === 0 || j === -3) { await this.filterPanel(fe, ctx, () => this.gearFilter(fit, fe, ctx).length); continue; }
+      if (j >= 1) { equip(S, id, slot, j === 1 ? null : opts[j - 2]); this.G.audio.sfx('item'); }
+      break;
+      }
     }
   }
   // pick the strongest piece for every slot (weapons by power, armor by defence + spirit)

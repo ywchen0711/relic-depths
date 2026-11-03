@@ -87,17 +87,92 @@ P.statsMenu = async function (pre) {
   }
 };
 
+// ---------------------------------------------------------------- filtering and sorting any list of equipment (bag, stash, shop, selling, equipping)
+const has = (o) => !!o && Object.values(o).some(v => v);
+const GF_RAR = [['全部', null], ['普通', g => !g.rarity && !g.rw], ['魔法', g => g.rarity === 1], ['稀有', g => g.rarity === 2], ['套裝', g => g.rarity === 4], ['暗金', g => g.rarity === 3], ['符文之語', g => !!g.rw]];
+const GF_KIND = [['全部', null], ['武器', g => g.slot === 'hand' && g.type !== 'shield'], ['盾', g => g.type === 'shield'], ...['head', 'body', 'arms', 'waist', 'legs', 'feet', 'back'].map(s => [SLOT_N[s], g => g.slot === s]), ['戒指', g => g.slot === 'acc' && g.kind === 'ring'], ['項鍊', g => g.slot === 'acc' && g.kind !== 'ring']];
+const GF_TRAIT = [['＋技能', g => g.fx?.skillAll > 0 || has(g.fx?.skillCls) || has(g.fx?.skillTree)], ['速度', g => g.spd > 0 || g.fx?.spdF > 0], ['抗性', g => has(g.fx?.res)], ['寶物尋找', g => g.fx?.mf > 0], ['吸血', g => g.fx?.drain > 0], ['會心', g => g.fx?.crit > 0], ['連擊', g => g.fx?.dbl > 0], ['觸發技能', g => g.fx?.proc?.length > 0], ['穿透', g => has(g.fx?.pierce)], ['有空孔', g => g.sock > (g.runes?.length || 0)], ['數值全滿', g => !!g.maxed]];
+const GF_SORT = [['稀有度', (a, b) => (b.rarity || 0) - (a.rarity || 0) || (b.il || 0) - (a.il || 0)], ['需要等級', (a, b) => (b.lvReq || 0) - (a.lvReq || 0)], ['賣價', (a, b) => (b.price || 0) - (a.price || 0)], ['品質', (a, b) => (b.qual ?? -1) - (a.qual ?? -1)], ['名稱', (a, b) => (a.name || '').localeCompare(b.name || '', 'zh-Hant')]];
+const newFilter = () => ({ rar: 0, kind: 0, who: 'all', tr: [], sort: 0 });
+// ctx: { kind: false hides the kind row (one slot is already chosen), who: false hides the who-can-use row }
+P.gearFilter = function (list, f, ctx = {}) {
+  const S = this.S, R = GF_RAR[f.rar][1], K = ctx.kind === false ? null : GF_KIND[f.kind][1], T = f.tr.map(i => GF_TRAIT[i][1]);
+  const who = ctx.who === false ? 'all' : f.who;
+  return list.filter(g => { const G = GEAR[g]; if (!G) return false;
+    if (R && !R(G)) return false; if (K && !K(G)) return false; if (T.some(t => !t(G))) return false;
+    if (who === 'none') return !Object.keys(S.heroes).some(id => canEquip(id, g)); // by class only: a piece for later is not junk
+    if (who !== 'all') return !!S.heroes[who] && canEquip(who, g);
+    return true; }).sort((a, b) => GF_SORT[f.sort][1](GEAR[a], GEAR[b]));
+};
+P.filterSummary = function (f, ctx = {}) {
+  const bits = [];
+  if (f.rar) bits.push(GF_RAR[f.rar][0]); if (f.kind && ctx.kind !== false) bits.push(GF_KIND[f.kind][0]);
+  if (ctx.who !== false && f.who !== 'all') bits.push(f.who === 'none' ? '沒人能用' : `${HEROES[f.who]?.name || '?'}能用`);
+  for (const i of f.tr) bits.push(GF_TRAIT[i][0]);
+  return (bits.length ? bits.join('・') : '全部') + (f.sort ? `　依${GF_SORT[f.sort][0]}` : '');
+};
+// the rows of chips: rarity, kind, who can use it, traits (several at once), sort order
+P.filterRows = function (f, ctx = {}) {
+  const S = this.S, rows = [['稀有度', GF_RAR.map(x => x[0]), 'rar']];
+  if (ctx.kind !== false) rows.push(['種類', GF_KIND.map(x => x[0]), 'kind']);
+  if (ctx.who !== false) { const ids = [...S.party, ...S.reserve].filter(id => S.heroes[id]); rows.push(['誰能用', ['全部', ...ids.map(id => HEROES[id].name), '沒人能用'], 'who', ['all', ...ids, 'none']]); }
+  rows.push(['特性', GF_TRAIT.map(x => x[0]), 'tr'], ['排序', GF_SORT.map(x => x[0]), 'sort']);
+  return rows;
+};
+const rowOn = (f, r, i) => r[2] === 'tr' ? f.tr.includes(i) : r[2] === 'who' ? f.who === r[3][i] : f[r[2]] === i;
+const rowSet = (f, r, i) => { if (r[2] === 'tr') { const k = f.tr.indexOf(i); if (k >= 0) f.tr.splice(k, 1); else f.tr.push(i); } else if (r[2] === 'who') f.who = r[3][i]; else f[r[2]] = i; };
+P.filterBarsHTML = function (f, ctx = {}, focus = -1, cur = -1) {
+  return this.filterRows(f, ctx).map((r, ri) => `<div class="sl-bar${ri === focus ? ' foc' : ''}"><span class="sl-lab">${r[0]}</span>${r[1].map((n, i) => `<span class="sl-chip${rowOn(f, r, i) ? ' on' : ''}${ri === focus && i === cur ? ' cur' : ''}" data-fr="${ri}" data-fi="${i}">${n}</span>`).join('')}</div>`).join('');
+};
+P.wireFilterBars = function (wrap, f, ctx, after) {
+  const rows = this.filterRows(f, ctx);
+  wrap.querySelectorAll('[data-fr]').forEach(e => e.onclick = () => { rowSet(f, rows[+e.dataset.fr], +e.dataset.fi); this.G.audio.sfx('move'); after(); });
+};
+// a window of its own, for the lists built on the plain chooser; resolves when closed
+P.filterPanel = function (f, ctx = {}, count) {
+  const G = this.G;
+  return new Promise((res) => {
+    const wrap = document.createElement('div'); wrap.className = 'chooser wide sellwin'; this.layer.appendChild(wrap);
+    let focus = 0; const curs = {};
+    const curOf = (rows) => curs[focus] ?? Math.max(0, rows[focus][1].findIndex((n, i) => rowOn(f, rows[focus], i)));
+    const build = () => {
+      const rows = this.filterRows(f, ctx); focus = Math.min(focus, rows.length - 1);
+      const n = count ? count() : null;
+      wrap.innerHTML = `<div class="ch-box noanim"><div class="ch-title">篩選・排序${n != null ? `　<small>符合 ${n} 件</small>` : ''}</div>${this.filterBarsHTML(f, ctx, focus, curOf(rows))}
+        <div class="sl-foot"><span class="sl-btn" data-a="reset">全部重設</span><span class="sl-sum"></span><span class="sl-btn go" data-a="done">確定</span></div>
+        <div class="sl-help">↑↓ 選列　←→ 選項目　Z 選取・勾選特性　X 確定</div></div>`;
+      this.wireFilterBars(wrap, f, ctx, build);
+      wrap.querySelector('[data-a="reset"]').onclick = () => { Object.assign(f, newFilter()); G.audio.sfx('move'); build(); };
+      wrap.querySelector('[data-a="done"]').onclick = close;
+    };
+    const close = () => { off(); wrap.remove(); G.audio.sfx('ok'); res(); };
+    const off = G.input.on((k) => {
+      const rows = this.filterRows(f, ctx), r = rows[focus], n = r[1].length, cur = curOf(rows);
+      if (k === 'up' || k === 'down') { focus = (focus + (k === 'up' ? rows.length - 1 : 1)) % rows.length; G.audio.sfx('move'); build(); }
+      if (k === 'left' || k === 'right') { const c = (cur + (k === 'left' ? n - 1 : 1)) % n; curs[focus] = c; if (r[2] !== 'tr') rowSet(f, r, c); G.audio.sfx('move'); build(); }
+      if (k === 'ok') { rowSet(f, r, cur); G.audio.sfx('move'); build(); }
+      if (k === 'cancel' || k === 'menu' || k === 'map') close();
+    });
+    build();
+  });
+};
+// the row on top of a list built on the plain chooser
+const FILTER_ROW = (ui, f, ctx, n, all) => ({ label: '🔍 篩選・排序', sub: `${ui.filterSummary(f, ctx)}　${n}/${all}` });
+const FILTER_TIP = '<div class="dim">選這一列（或按 M）改變篩選和排序</div>';
+
 // ---------------------------------------------------------------- the bag: every piece of equipment you carry
 P.gearOwned = function () { return Object.keys(this.S.items).filter(g => this.S.items[g] > 0 && GEAR[g]).sort((a, b) => (GEAR[b].rarity || 0) - (GEAR[a].rarity || 0) || (GEAR[b].il || 0) - (GEAR[a].il || 0)); };
 P.bagMenu = async function (o = {}) {
-  const S = this.S; let st = 0;
+  const S = this.S, f = this.gf ||= newFilter(); let st = 1;
   for (;;) {
-    const list = this.gearOwned();
-    if (!list.length) { await this.info('<p>背包裡沒有裝備。</p>', '背包'); return; }
-    const i = await this.choose(list.map(g => ({ icon: null, label: col(GEAR[g]), sub: this.gearKind(GEAR[g]) })), { title: `背包　${list.length} 件　<span class="gil">${S.gil} G</span>${o.sell ? '　<small>選一件賣掉</small>' : ''}`, start: st, info: (k) => this.gearHTML(list[k]) + (o.sell ? `<div style="color:#ffe04a">賣價 ${sellPrice(GEAR[list[k]])} G</div>` : '') + this.whoCanWear(list[k]) });
-    if (i < 0) return;
-    st = Math.min(i, list.length - 2);
-    const g = list[i], G = GEAR[g];
+    const own = this.gearOwned();
+    if (!own.length) { await this.info('<p>背包裡沒有裝備。</p>', '背包'); return; }
+    const list = this.gearFilter(own, f);
+    const i = await this.choose([FILTER_ROW(this, f, {}, list.length, own.length), ...list.map(g => ({ icon: null, label: col(GEAR[g]), sub: this.gearKind(GEAR[g]) }))], { title: `背包　${own.length} 件　<span class="gil">${S.gil} G</span>${o.sell ? '　<small>選一件賣掉</small>' : ''}`, start: st, onMap: true, info: (k) => k === 0 ? (list.length ? '' : '<p>沒有符合條件的裝備。</p>') + FILTER_TIP : this.gearHTML(list[k - 1]) + (o.sell ? `<div style="color:#ffe04a">賣價 ${sellPrice(GEAR[list[k - 1]])} G</div>` : '') + this.whoCanWear(list[k - 1]) });
+    if (i < 0 && i !== -3) return;
+    if (i <= 0) { await this.filterPanel(f, {}, () => this.gearFilter(this.gearOwned(), f).length); st = 1; continue; }
+    st = Math.min(i, list.length - 1);
+    const g = list[i - 1], G = GEAR[g];
     if (o.sell) { if (await this.yesno(`把 ${G.name} 以 ${sellPrice(G)} G 賣掉？`)) { S.gil += sellPrice(G); this.removeGear(g); this.G.audio.sfx('item'); } continue; }
     const acts = ['裝備給…', '丟掉'];
     const a = await this.choose(acts, { title: G.name, cls: 'small' });
@@ -127,14 +202,22 @@ P.stashMenu = async function () {
     if (i < 0) return;
     if (i === 0) {
       let st = 0;
-      for (;;) { const list = this.gearOwned(); if (!list.length) break; if (S.stash.length >= 120) { this.toast('倉庫滿了'); break; }
-        const k = await this.choose(list.map(g => ({ label: col(GEAR[g]), sub: this.gearKind(GEAR[g]) })), { title: '存進倉庫', start: st, info: (j) => this.gearHTML(list[j]) }); if (k < 0) break; st = k;
-        S.items[list[k]]--; if (S.items[list[k]] <= 0) delete S.items[list[k]]; S.stash.push(list[k]); this.G.audio.sfx('item'); }
+      const f = this.gf ||= newFilter(); st = 1;
+      for (;;) { const own = this.gearOwned(); if (!own.length) break; if (S.stash.length >= 120) { this.toast('倉庫滿了'); break; }
+        const list = this.gearFilter(own, f);
+        const k = await this.choose([FILTER_ROW(this, f, {}, list.length, own.length), ...list.map(g => ({ label: col(GEAR[g]), sub: this.gearKind(GEAR[g]) }))], { title: `存進倉庫　${S.stash.length}/120`, start: st, onMap: true, info: (j) => j === 0 ? FILTER_TIP : this.gearHTML(list[j - 1]) + this.whoCanWear(list[j - 1]) });
+        if (k < 0 && k !== -3) break; if (k <= 0) { await this.filterPanel(f, {}, () => this.gearFilter(this.gearOwned(), f).length); st = 1; continue; }
+        st = Math.min(k, list.length - 1); const g = list[k - 1];
+        S.items[g]--; if (S.items[g] <= 0) delete S.items[g]; S.stash.push(g); this.G.audio.sfx('item'); }
     } else {
       let st = 0;
-      for (;;) { const list = S.stash.filter(g => GEAR[g]); if (!list.length) break;
-        const k = await this.choose(list.map(g => ({ label: col(GEAR[g]), sub: this.gearKind(GEAR[g]) })), { title: '從倉庫拿出', start: st, info: (j) => this.gearHTML(list[j]) + this.whoCanWear(list[j]) }); if (k < 0) break; st = k;
-        S.stash.splice(S.stash.indexOf(list[k]), 1); addItem(S, list[k], 1); this.G.audio.sfx('item'); }
+      const f = this.gfStash ||= newFilter(); st = 1;
+      for (;;) { const all = S.stash.filter(g => GEAR[g]); if (!all.length) break;
+        const list = this.gearFilter(all, f);
+        const k = await this.choose([FILTER_ROW(this, f, {}, list.length, all.length), ...list.map(g => ({ label: col(GEAR[g]), sub: this.gearKind(GEAR[g]) }))], { title: `從倉庫拿出　${all.length}/120`, start: st, onMap: true, info: (j) => j === 0 ? FILTER_TIP : this.gearHTML(list[j - 1]) + this.whoCanWear(list[j - 1]) });
+        if (k < 0 && k !== -3) break; if (k <= 0) { await this.filterPanel(f, {}, () => this.gearFilter(S.stash.filter(g => GEAR[g]), f).length); st = 1; continue; }
+        st = Math.min(k, list.length - 1); const g = list[k - 1];
+        S.stash.splice(S.stash.indexOf(g), 1); addItem(S, g, 1); this.G.audio.sfx('item'); }
     }
   }
 };
@@ -149,8 +232,11 @@ P.merchantMenu = async function () {
     if (i < 0) return;
     if (i === 0) {
       let st = 0;
-      for (;;) { const list = S.shop.filter(g => GEAR[g]); if (!list.length) { this.toast('賣完了'); break; }
-        const k = await this.choose(list.map(g => ({ label: col(GEAR[g]), sub: `${GEAR[g].price} G` })), { title: `買裝備　<span class="gil">${S.gil} G</span>`, start: st, info: (j) => this.gearHTML(list[j]) + this.whoCanWear(list[j]) }); if (k < 0) break; st = k;
+      for (;;) { let list = S.shop.filter(g => GEAR[g]); if (!list.length) { this.toast('賣完了'); break; }
+        const fs = this.gfShop ||= newFilter(), all = list; list = this.gearFilter(all, fs);
+        const k0 = await this.choose([FILTER_ROW(this, fs, {}, list.length, all.length), ...list.map(g => ({ label: col(GEAR[g]), sub: `${GEAR[g].price} G` }))], { title: `買裝備　<span class="gil">${S.gil} G</span>`, start: st, onMap: true, info: (j) => j === 0 ? FILTER_TIP : this.gearHTML(list[j - 1]) + this.whoCanWear(list[j - 1]) });
+        if (k0 < 0 && k0 !== -3) break; if (k0 <= 0) { await this.filterPanel(fs, {}, () => this.gearFilter(all, fs).length); st = 1; continue; }
+        const k = k0 - 1; st = k0;
         const g = list[k]; if (S.gil < GEAR[g].price) { this.G.audio.sfx('error'); this.toast('金幣不足'); continue; }
         S.gil -= GEAR[g].price; addItem(S, g, 1); S.shop = S.shop.filter(x => x !== g); this.G.audio.sfx('item'); }
     }
@@ -166,37 +252,29 @@ P.merchantMenu = async function () {
 };
 
 // ---------------------------------------------------------------- selling: filter the bag, tick what should go, sell it all at once
-const SELL_RAR = [['全部', null], ['普通', 0], ['魔法', 1], ['稀有', 2], ['套裝', 4], ['暗金', 3]];
-const SELL_CAT = [['全部', null], ['武器', 'W'], ['防具', 'A'], ['盾', 'S'], ['飾品', 'J']];
-const catOf = (G) => G.slot === 'acc' ? 'J' : G.slot === 'hand' ? (G.type === 'shield' ? 'S' : 'W') : 'A';
 P.sellMenu = function () {
   const S = this.S, G = this.G, ui = this;
-  const f = this.sellFilter = this.sellFilter || { rar: 0, cat: 0, useless: false };
+  const f = this.sellFilter ||= { ...newFilter(), rar: 1 };
   const picked = new Set(); let sel = 0, list = [];
   return new Promise((res) => {
     const wrap = document.createElement('div'); wrap.className = 'chooser wide sellwin'; this.layer.appendChild(wrap);
-    const nobody = (g) => !Object.keys(S.heroes).some(id => canEquip(id, g)); // by class only: a piece for later is not junk
     const refresh = () => {
-      const r = SELL_RAR[f.rar][1], c = SELL_CAT[f.cat][1];
-      list = this.gearOwned().filter(g => (r == null || (GEAR[g].rarity ?? 0) === r) && (c == null || catOf(GEAR[g]) === c) && (!f.useless || nobody(g)));
+      list = this.gearFilter(this.gearOwned(), f);
       for (const g of [...picked]) if (!S.items[g]) picked.delete(g);
       sel = Math.max(0, Math.min(sel, list.length - 1));
     };
     const total = () => [...picked].reduce((s, g) => s + sellPrice(GEAR[g]) * (S.items[g] || 0), 0);
-    const chips = (arr, cur, key) => arr.map(([n], i) => `<span class="sl-chip${i === cur ? ' on' : ''}" data-${key}="${i}">${n}</span>`).join('');
     const build = () => {
       refresh();
       const all = list.length && list.every(g => picked.has(g));
       wrap.innerHTML = `<div class="ch-box noanim"><div class="ch-title">賣裝備　<span class="gil">${S.gil} G</span></div>
-        <div class="sl-bar"><span class="sl-lab">稀有度</span>${chips(SELL_RAR, f.rar, 'r')}</div>
-        <div class="sl-bar"><span class="sl-lab">種類</span>${chips(SELL_CAT, f.cat, 'c')}<span class="sl-chip${f.useless ? ' on' : ''}" data-u="1">只看沒人能用的</span></div>
+        <details class="sl-more"${f.open ? ' open' : ''}><summary>🔍 篩選・排序：${this.filterSummary(f)}　<small>${list.length} 件</small></summary>${this.filterBarsHTML(f)}</details>
         <div class="ch-cols"><div class="ch-list">${list.length ? list.map((g, i) => `<div class="ch-it${i === sel ? ' sel' : ''}" data-i="${i}"><span class="sl-box${picked.has(g) ? ' on' : ''}">${picked.has(g) ? '✔' : ''}</span><span class="ch-l">${col(GEAR[g])}${S.items[g] > 1 ? ` ×${S.items[g]}` : ''}</span><span class="ch-s">${sellPrice(GEAR[g])} G</span></div>`).join('') : '<div class="dim" style="padding:12px">沒有符合的裝備</div>'}</div>
         <div class="ch-info">${list[sel] ? this.gearHTML(list[sel]) + `<div style="color:#ffe04a">賣價 ${sellPrice(GEAR[list[sel]])} G</div>` + this.whoCanWear(list[sel]) : ''}</div></div>
         <div class="sl-foot"><span class="sl-btn" data-a="all">${all ? '取消全選' : '全選目前列出的'}</span><span class="sl-btn" data-a="none">清除勾選</span><span class="sl-sum">已選 ${picked.size} 件　共 <b>${total()} G</b></span><span class="sl-btn go${picked.size ? '' : ' dis'}" data-a="sell">賣出</span><span class="sl-btn" data-a="back">離開</span></div>
-        <div class="sl-help">↑↓ 移動　Z 勾選　←→ 換稀有度　M 全選　C 賣出　X 離開</div></div>`;
-      wrap.querySelectorAll('[data-r]').forEach(e => e.onclick = () => { f.rar = +e.dataset.r; sel = 0; G.audio.sfx('move'); build(); });
-      wrap.querySelectorAll('[data-c]').forEach(e => e.onclick = () => { f.cat = +e.dataset.c; sel = 0; G.audio.sfx('move'); build(); });
-      wrap.querySelector('[data-u]').onclick = () => { f.useless = !f.useless; sel = 0; G.audio.sfx('move'); build(); };
+        <div class="sl-help">↑↓ 移動　Z 勾選　←→ 換稀有度　R 篩選・排序　M 全選　C 賣出　X 離開</div></div>`;
+      this.wireFilterBars(wrap, f, {}, () => { sel = 0; build(); });
+      { const d = wrap.querySelector('.sl-more'); d.ontoggle = () => { f.open = d.open; }; }
       wrap.querySelectorAll('.ch-it').forEach(e => e.onclick = () => { const i = +e.dataset.i; sel = i; toggle(); });
       wrap.querySelectorAll('[data-a]').forEach(e => e.onclick = () => act(e.dataset.a));
       wrap.querySelector('.ch-it.sel')?.scrollIntoView({ block: 'nearest' });
@@ -223,7 +301,8 @@ P.sellMenu = function () {
       if (busy) return;
       if (k === 'up' && list.length) { sel = (sel + list.length - 1) % list.length; G.audio.sfx('move'); build(); }
       if (k === 'down' && list.length) { sel = (sel + 1) % list.length; G.audio.sfx('move'); build(); }
-      if (k === 'left' || k === 'right') { f.rar = (f.rar + (k === 'left' ? SELL_RAR.length - 1 : 1)) % SELL_RAR.length; sel = 0; G.audio.sfx('move'); build(); }
+      if (k === 'left' || k === 'right') { f.rar = (f.rar + (k === 'left' ? GF_RAR.length - 1 : 1)) % GF_RAR.length; sel = 0; G.audio.sfx('move'); build(); }
+      if (k === 'mount') { busy = true; wrap.style.visibility = 'hidden'; ui.filterPanel(f, {}, () => ui.gearFilter(ui.gearOwned(), f).length).then(() => { busy = false; wrap.style.visibility = ''; sel = 0; build(); }); }
       if (k === 'ok') toggle();
       if (k === 'map') act('all');
       if (k === 'menu') act('sell');
