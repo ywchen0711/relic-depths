@@ -434,6 +434,8 @@ const GEAR_T = {
 let gearResolver = () => undefined;
 const gearDyn = new Map();
 export function setGearResolver(f) { gearResolver = f; }
+// a piece was remade (see loot.js, awakening): its refined / enchanted copies are made again from it
+export function forgetGear(base) { for (const k of [...gearDyn.keys()]) if (k.startsWith(base + '+') || k.startsWith(base + '@')) gearDyn.delete(k); }
 export const GEAR = new Proxy(GEAR_T, {
   get(t, k) { if (k in t) return t[k]; if (typeof k !== 'string' || !/[+@]/.test(k)) return undefined; if (!gearDyn.has(k)) gearDyn.set(k, gearResolver(k)); return gearDyn.get(k); },
   has(t, k) { return k in t || (typeof k === 'string' && /[+@]/.test(k) && !!gearResolver(k)); },

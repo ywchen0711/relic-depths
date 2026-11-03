@@ -6,7 +6,7 @@ import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N,
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
 import { STATE_N, STATE_DESC, REACTIONS, PAIRS, huntText, NEW_ECHOES } from './depth.js?v=1';
-import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines } from './loot.js?v=1';
+import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken } from './loot.js?v=1';
 import { CLASSES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
 import { personSheet, battleSheet } from './pixel.js?v=1';
@@ -326,7 +326,7 @@ export class UI {
   rollHTML(G) {
     if (G.qual == null) return '';
     const L = rollLines(G), pc = Math.round(G.qual * 100), col = G.godly ? '#ffd86a' : pc >= 80 ? '#8affa0' : pc >= 40 ? '#e8e8e8' : '#ff9a8a';
-    return `<div class="gi-roll">${G.godly ? '<div class="gi-god">★ 神裝：所有數值都是滿值 ★</div>' : G.maxed ? '<div class="gi-god" style="text-shadow:none;font-weight:normal">滿值</div>' : ''}<div class="gi-q"><span>品質</span><i><b style="width:${pc}%;background:${col}"></b></i><em style="color:${col}">${pc}%</em></div>${L.map(l => `<div class="gi-rl${l.top ? ' top' : ''}"><span>${l.name}</span><b>${l.v}</b><small>${l.lo}–${l.hi}</small></div>`).join('')}</div>`;
+    return `<div class="gi-roll">${G.awake ? `<div class="gi-god">✦ 已覺醒：Lv ${G.awake} 的力量</div>` : ''}${G.godly ? '<div class="gi-god">★ 神裝：所有數值都是滿值 ★</div>' : G.maxed ? '<div class="gi-god" style="text-shadow:none;font-weight:normal">滿值</div>' : ''}<div class="gi-q"><span>品質</span><i><b style="width:${pc}%;background:${col}"></b></i><em style="color:${col}">${pc}%</em></div>${L.map(l => `<div class="gi-rl${l.top ? ' top' : ''}"><span>${l.name}</span><b>${l.v}</b><small>${l.lo}–${l.hi}</small></div>`).join('')}</div>`;
   }
   setHTML(sid, id) {
     const D = SETS[sid], have = id ? setBonus(EQUIP_SLOTS.map(sl => this.S.heroes[id].equip[sl]).filter(Boolean)).count[sid] || 0 : 0;
@@ -639,8 +639,9 @@ export class UI {
     const owned = () => { const out = []; for (const id of Object.keys(S.items)) if (S.items[id] > 0 && GEAR[id] && GEAR[id].tier != null && GEAR[id].tier <= maxTier) out.push({ id, where: null }); for (const h of Object.keys(S.heroes)) for (const sl of EQUIP_SLOTS) { const g = S.heroes[h].equip[sl]; if (g && GEAR[g] && GEAR[g].tier != null) out.push({ id: g, where: [h, sl] }); } return out; };
     const swap = (o, nid) => { if (o.where) S.heroes[o.where[0]].equip[o.where[1]] = nid; else { addItem(S, o.id, -1); if (S.items[o.id] <= 0) delete S.items[o.id]; addItem(S, nid, 1); } };
     for (;;) {
-      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p>' });
+      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
       if (m < 0) return;
+      if (m === 2) { await this.awakenMenu(owned, parse); continue; }
       for (;;) {
         const list = owned().filter(o => m === 0 ? parse(o.id).n < 5 : GEAR[o.id].slot !== 'acc');
         if (!list.length) { this.toast('沒有可以處理的裝備'); break; }
@@ -666,6 +667,30 @@ export class UI {
           swap(o, make(P.base, P.n, el)); this.G.audio.sfx('levelup'); this.toast(`${GEAR[make(P.base, P.n, el)].name} 完成！`);
         }
       }
+    }
+  }
+  // the god pieces you own, remade at the party's level
+  async awakenMenu(owned, parse) {
+    const S = this.S, top = Math.max(...Object.values(S.heroes).map(h => h.lv || 1));
+    for (;;) {
+      const seen = new Set(), list = [];
+      for (const o of owned()) { const uid = parse(o.id).base; if (!GEAR[uid]?.godly || !S.loot?.[uid] || seen.has(uid)) continue; seen.add(uid); list.push({ ...o, uid }); }
+      for (const id of Object.keys(S.items)) { const uid = parse(id).base; if (S.items[id] > 0 && GEAR[uid]?.godly && S.loot?.[uid] && !seen.has(uid)) { seen.add(uid); list.push({ id, uid, where: null }); } }
+      if (!list.length) { await this.info('<p>你還沒有 ★ 神裝。</p><p>所有數值都骰到最高的裝備就是神裝，名字前面有 ★。首領、精英和死王宮殿掉出神裝的機率比較高。</p>', '神裝覺醒'); return; }
+      const lvOf = (o) => lootLevel(S.loot[o.uid]), cost = (L) => Math.round(L * L * 6);
+      const i = await this.choose(list.map(o => ({ label: `<span style="color:${GEAR[o.id].rarColor}">${GEAR[o.id].name}</span>`, sub: `Lv ${lvOf(o)}${lvOf(o) + 5 <= top ? ` → ${top}` : '　（已是你的水準）'}` })), { title: `神裝覺醒　隊伍最高 Lv ${top}　<span class="gil">${S.gil} G</span>`, info: (k) => this.gearHTML(list[k].id) });
+      if (i < 0) return;
+      const o = list[i], L0 = lvOf(o);
+      if (L0 + 5 > top) { this.toast(`這件已經是 Lv ${L0} 的水準了；隊伍等級比它高 5 級以上才能再覺醒`); continue; }
+      const c = cost(top), name = GEAR[o.id].name;
+      if (!await this.yesno(`把「${name}」覺醒到 Lv ${top}？
+需要 ${c} G。
+
+底材、詞綴、能力都會變成 Lv ${top} 的水準，數值仍然全部滿值。
+穿戴等級也會提高到約 ${Math.max(1, top - 8)}。`)) continue;
+      if (S.gil < c) { this.toast('錢不夠'); continue; }
+      S.gil -= c; awaken(S, o.uid, top); this.G.audio.sfx('levelup');
+      await this.info(this.gearHTML(o.id), '覺醒完成！');
     }
   }
   whoCan(g) { const S = this.S; return `<div class="cmp">${Object.keys(S.heroes).map(id => canEquip(id, g) ? `<div><span>${HEROES[id].name}</span>${this.compareShort(id, g)}</div>` : `<div class="dim"><span>${HEROES[id].name}</span>不能裝備</div>`).join('')}</div>`; }

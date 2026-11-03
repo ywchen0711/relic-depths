@@ -6,7 +6,7 @@
 //   set    (green)  - named pieces that grow stronger the more of the set you wear
 // An item lives in S.loot[uid] as a small spec; at load it is turned into a GEAR entry under its uid, so the rest of
 // the game (stats, battles, paper dolls) treats it like any other piece of equipment.
-import { GEAR, ELEM, ITEMS } from './data.js?v=1';
+import { GEAR, ELEM, ITEMS, forgetGear } from './data.js?v=1';
 ITEMS.i_tp = { name: '回城卷軸', price: 60, use: { townPortal: true }, field: true, desc: '打開通往營地的傳送門；走進營地的藍色傳送門（或在水晶選「回到傳送門」）就回到原地', cat: 'tool' };
 import { WTYPES, mergeFx, FAM_N, STATUS_N } from './content.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
@@ -118,23 +118,52 @@ const END = {
 for (const [id, tiers] of Object.entries(END)) { const A = AFFIXES.find(a => a.id === id); if (A) A.tiers.push(...tiers); }
 for (const c of Object.keys(CLASSES)) { const A = AFFIXES.find(a => a.id === 'cls' + c); if (A) A.tiers.push([72, CLASSES[c].name + '神匠的', (r) => ({ fx: { skillCls: { [c]: 3 } } })], [88, CLASSES[c].name + '傳說的', (r, u) => ({ fx: { skillCls: { [c]: pin([3, 4], u) } } }), MO, [3, 4]]); }
 // +skills to one skill tree, like "+3 to Fire Skills": named after the tree it rolled
-AFFIXES.push({ id: 'tree', pre: true, cats: 'WJAS', tiers: [[18, '', (r) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: 1 } } })], [44, '', (r, u) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: pin([1, 2], u) } } }), undefined, [1, 2]], [70, '', (r, u) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: pin([2, 3], u) } } }), undefined, [2, 3]], [86, '', (r, u) => ({ fx: { skillTree: { [pick(TREE_KEYS, r)]: pin([3, 4], u) } } }), MO, [3, 4]]] });
+AFFIXES.push({ id: 'tree', pre: true, cats: 'WJAS', tiers: [[18, '', (r, u, k) => ({ fx: { skillTree: { [pick(k || TREE_KEYS, r)]: 1 } } })], [44, '', (r, u, k) => ({ fx: { skillTree: { [pick(k || TREE_KEYS, r)]: pin([1, 2], u) } } }), undefined, [1, 2]], [70, '', (r, u, k) => ({ fx: { skillTree: { [pick(k || TREE_KEYS, r)]: pin([2, 3], u) } } }), undefined, [2, 3]], [86, '', (r, u, k) => ({ fx: { skillTree: { [pick(k || TREE_KEYS, r)]: pin([3, 4], u) } } }), MO, [3, 4]]] });
 const AFFIX_BY = Object.fromEntries(AFFIXES.map(a => [a.id, a]));
 export const AFFIX_COUNT = AFFIXES.reduce((s, a) => s + a.tiers.length, 0);
 
-function rollAffix(cat, ilvl, pre, taken, r, rar = 1, perfect = false) {
+// can a class use this base at all (weapon type, shield, armour style)?
+export function canWear(c, b) {
+  const G = GEAR[b], X = CLASSES[c]; if (!G || !X) return true;
+  if (G.slot === 'acc') return true;
+  if (G.slot === 'hand') return G.type === 'shield' ? !!X.shield : X.weapons.includes(G.type);
+  return !G.style || X.styles.includes(G.style);
+}
+function rollAffix(cat, ilvl, pre, taken, r, rar = 1, perfect = false, b = null) {
   const fits = (t) => t[0] <= ilvl && (!t[3] || rar === 1);
-  const pool = AFFIXES.filter(a => a.pre === pre && a.cats.includes(cat) && !taken.has(a.id) && a.tiers.some(fits));
+  // +class skills only on what that class can use, +tree skills only for the trees of classes that can
+  const keys = b ? TREE_KEYS.filter(k => canWear(k.split('_')[0], b)) : TREE_KEYS;
+  const forBase = (a) => !b || (/^cls/.test(a.id) ? canWear(a.id.slice(3), b) : a.id !== 'tree' || keys.length > 0);
+  const pool = AFFIXES.filter(a => a.pre === pre && a.cats.includes(cat) && !taken.has(a.id) && a.tiers.some(fits) && forBase(a));
   if (!pool.length) return null;
   const A = pick(pool, r); const ok = A.tiers.filter(fits);
   // higher tiers are rarer: weight the best few allowed
   const ti = Math.max(0, ok.length - 1 - Math.floor(Math.pow(r(), 0.6) * Math.min(3, ok.length)));
   const T = ok[ti]; taken.add(A.id);
   const u = perfect ? 1 : r3(r()); // where in the tier's range the value lands (kept, so the tooltip can show it)
-  return [A.id, A.tiers.indexOf(T), T[2](r, u), u];
+  return [A.id, A.tiers.indexOf(T), T[2](r, u, keys), u];
 }
 
 // ---------------------------------------------------------------- uniques
+// a fixed list of powers made for level lv, as it would be at level L: flat numbers grow fully, chances and percentages a third as fast
+function scaleP(p, lv, L) {
+  const m = (60 + L * 2.4) / (60 + lv * 2.4), m2 = 1 + (m - 1) * 0.35, q = { ...p };
+  for (const k of ['ed', 'edef', 'hp', 'mp', 'atk', 'def', 'mag', 'spr']) if (q[k]) q[k] = Math.round(q[k] * m);
+  if (q.spd) q.spd += Math.floor((L - lv) / 25);
+  if (q.evade) q.evade = Math.round(q.evade * m2);
+  const R = (o) => o && Object.fromEntries(Object.entries(o).map(([e, v]) => [e, Math.min(60, Math.round(v * m2))]));
+  if (q.res) q.res = R(q.res);
+  if (q.fx) {
+    const f = q.fx = { ...q.fx };
+    for (const k of Object.keys(f)) {
+      if (ROLL_FX.has(k) && typeof f[k] === 'number' && (f[k] < 1 || k === 'mf')) f[k] = k === 'mf' ? Math.round(f[k] * m2) : Math.round(f[k] * m2 * 100) / 100;
+      else if (k === 'elUp' || k === 'onHit') f[k] = Object.fromEntries(Object.entries(f[k]).map(([e, v]) => [e, Math.round(v * m2 * 100) / 100]));
+      else if (k === 'slay') f[k] = Object.fromEntries(Object.entries(f[k]).map(([e, v]) => [e, Math.round((1 + (v - 1) * m2) * 100) / 100]));
+      else if (k === 'res') f[k] = R(f[k]);
+    }
+  }
+  return q;
+}
 // [id, name, base (weapon type | slot:style | ring | amulet | shield kind), min base tier, level req, powers]
 const U = [
   ['u_axe1', '碎顱者', 'axe', 0, 3, { ed: 120, fx: { onHit: { stun: 0.2 }, crit: 0.08 } }, '一把沾著乾血的手斧'],
@@ -187,10 +216,10 @@ const U = [
   ['u_feet2', '七里靴', 'feet:heavy', 5, 50, { spd: 6, edef: 120, fx: { first: 1, mf: 25 } }, '一步就是七里'],
 ];
 export const UNIQUES = {};
-for (const [id, name, base, tier, lv, p, flavor] of U) UNIQUES[id] = { id, name, base, tier, lv, p, flavor };
+for (const [id, name, base, tier, lv, p, flavor] of U) UNIQUES[id] = { id, name, base, tier, lv, p, flavor, mk: (L) => scaleP(p, lv, L) };
 // the hundred from loot2.js: powers grow with their level
 const isWpn = (b) => !!WTYPES[b.split(':')[0]];
-U2.forEach(([name, base, lv, tokens, flavor], i) => { UNIQUES[`u2_${i}`] = { id: `u2_${i}`, name, base, tier: Math.min(9, Math.floor(lv / 9)), lv, p: powers(tokens, lv, isWpn(base)), flavor }; });
+U2.forEach(([name, base, lv, tokens, flavor], i) => { UNIQUES[`u2_${i}`] = { id: `u2_${i}`, name, base, tier: Math.min(9, Math.floor(lv / 9)), lv, p: powers(tokens, lv, isWpn(base)), flavor, mk: (L) => powers(tokens, L, isWpn(base)) }; });
 
 // ---------------------------------------------------------------- sets
 // pieces: [base, piece name, own powers]; bonus[n] applies when n pieces are worn
@@ -209,7 +238,7 @@ const SETS_DEF = [
 export const SETS = {}; export const SET_ITEMS = {};
 for (const [id, name, lv, pieces, bonus] of SETS_DEF) {
   SETS[id] = { id, name, lv, bonus, pieces: pieces.map((p, i) => `${id}_${i}`) };
-  pieces.forEach(([base, pn, p], i) => { SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p }; });
+  pieces.forEach(([base, pn, p], i) => { SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p, mk: (L) => scaleP(p, lv, L) }; });
 }
 // the thirty from loot2.js: each piece has a little of the theme, the set grows into it
 SETS2.forEach(([name, lv, cls, themes, pieces], si) => {
@@ -218,7 +247,7 @@ SETS2.forEach(([name, lv, cls, themes, pieces], si) => {
   if (n >= 4) bonus[4] = { fx: powers(n === 4 ? `${t[2]} ${top}` : t[2], lv, false, 0.8, true).fx };
   if (n >= 5) bonus[5] = { fx: powers(`${top} ${t[0]} skill`, lv, false, 0.8, true).fx };
   SETS[id] = { id, name, lv, bonus, pieces: pieces.map((p, i) => `${id}_${i}`) };
-  pieces.forEach(([base, pn], i) => { SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p: powers(`${isWpn(base) ? 'ed' : base === 'ring' || base === 'amulet' ? 'hp' : 'edef'} ${t[i % t.length]}`, lv, isWpn(base), 0.5) }; });
+  pieces.forEach(([base, pn], i) => { const tok = `${isWpn(base) ? 'ed' : base === 'ring' || base === 'amulet' ? 'hp' : 'edef'} ${t[i % t.length]}`; SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p: powers(tok, lv, isWpn(base), 0.5), mk: (L) => powers(tok, L, isWpn(base), 0.5) }; });
 });
 export function setBonusFx(equipIds) {
   const count = {};
@@ -266,8 +295,8 @@ export function rollItem(S, ilvl, o = {}, r = Math.random) {
   if (rar === 0) pool = pool.filter(b => GEAR[b].slot !== 'acc');
   if (!pool.length) pool = BASES.filter(b => GEAR[b].tier === 0);
   const b = pick(pool, r), cat = catOf(GEAR[b]), taken = new Set(), a = [];
-  if (rar === 1) { const np = r() < 0.6 ? 1 : 0, ns = np && r() < 0.5 ? 0 : 1; for (let i = 0; i < np; i++) { const x = rollAffix(cat, ilvl, true, taken, r, 1, pf); if (x) a.push(x); } for (let i = 0; i < ns || !a.length && i < 1; i++) { const x = rollAffix(cat, ilvl, false, taken, r, 1, pf); if (x) a.push(x); } }
-  if (rar === 2) { const n = rint(ilvl >= 70 ? 4 : 3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r, 2, pf); if (x) { a.push(x); if (want) pre++; else suf++; } } }
+  if (rar === 1) { const np = r() < 0.6 ? 1 : 0, ns = np && r() < 0.5 ? 0 : 1; for (let i = 0; i < np; i++) { const x = rollAffix(cat, ilvl, true, taken, r, 1, pf, b); if (x) a.push(x); } for (let i = 0; i < ns || !a.length && i < 1; i++) { const x = rollAffix(cat, ilvl, false, taken, r, 1, pf, b); if (x) a.push(x); } }
+  if (rar === 2) { const n = rint(ilvl >= 70 ? 4 : 3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r, 2, pf, b); if (x) { a.push(x); if (want) pre++; else suf++; } } }
   const spec = { b, r: rar, il: ilvl, a, ...(pf ? { pf: 1 } : {}) };
   if (rar === 2) spec.n = rareName(r);
   if (rar === 0 && r() < 0.15) spec.q = rint(5, 15, r); // superior
@@ -287,6 +316,13 @@ export function register(S, spec) {
 }
 export function restoreLoot(S) { for (const [uid, spec] of Object.entries(S.loot || {})) GEAR[uid] = build(spec); }
 export function dropLoot(S, uid) { delete S.loot?.[uid]; }
+// the level a piece is made at, and awakening a god piece to level L (its rolls stay at the top)
+export const lootLevel = (spec) => Math.max(spec.aw || 0, spec.il || 1, UNIQUES[spec.u]?.lv || 0, SET_ITEMS[spec.s]?.lv || 0);
+export function awaken(S, uid, L) {
+  const spec = S.loot?.[uid]; if (!spec) return false;
+  spec.aw = Math.min(99, L); spec.pf = 1; for (const a of spec.a || []) a[3] = 1;
+  GEAR[uid] = build(spec); forgetGear(uid); return true;
+}
 
 const STATK = ['hp', 'mp', 'atk', 'def', 'mag', 'spr', 'spd'];
 // ---------------------------------------------------------------- rolled numbers
@@ -332,9 +368,13 @@ function apply(g, p) {
   if (p.evade) fx.evade = (fx.evade || 0) + p.evade / 100;
   g.fx = mergeFx(g.fx || {}, fx);
 }
+// awakening: a god piece remade at a higher level, on the base of that level, every affix at its best tier there
+const upBase = (id, L) => { const m = /^(g_.+?)(\d+)$/.exec(id); if (!m) return id; const t = Math.min(9, Math.floor((L - 1) / 8)); return +m[2] - 1 < t && GEAR[m[1] + (t + 1)] ? m[1] + (t + 1) : id; };
+const topTier = (A, L, rar) => { let best = -1; A.tiers.forEach((t, i) => { if (t[0] <= L && (!t[3] || rar === 1)) best = i; }); return best; };
 export function build(spec) {
-  const B = GEAR[spec.b]; if (!B) return { name: '???', slot: 'acc', tier: 0, price: 1 };
-  const g = { ...B, fx: { ...(B.fx || {}) }, base: spec.b, baseName: B.name, rarity: spec.r, il: spec.il, uid: spec.uid, loot: true };
+  const aw = spec.aw || 0, bid = aw ? upBase(spec.b, aw) : spec.b;
+  const B = GEAR[bid]; if (!B) return { name: '???', slot: 'acc', tier: 0, price: 1 };
+  const g = { ...B, fx: { ...(B.fx || {}) }, base: bid, awake: aw || undefined, baseName: B.name, rarity: spec.r, il: Math.max(spec.il, aw), uid: spec.uid, loot: true };
   delete g.teach; delete g.ap;
   // the rolls: pieces from before rolls existed have none, and keep the middle of every range
   const rolls = g.rolls = [], old = spec.bu == null, V = spec.v || [];
@@ -343,13 +383,16 @@ export function build(spec) {
   for (const k of ['atk', 'def', 'mag', 'spr', 'hp', 'mp']) if (B[k] > 0 && !old) { const [x, w, b, i, n] = rollV(B[k], 0.1, bu); g[k] = x; if (n) rolls.push(['base.' + k, x, w, b, i, n]); }
   if (spec.q) { if (g.atk) g.atk = Math.round(g.atk * (1 + spec.q / 100)); if (g.def) g.def = Math.round(g.def * (1 + spec.q / 100)); }
   let pre = '', suf = '';
-  for (const [aid, ti, p, u] of spec.a || []) { const A = AFFIX_BY[aid], rg = A?.tiers[ti]?.[4]; if (u != null && rg && rg[1] > rg[0]) rolls.push(['aff.' + aid, pin(rg, u), rg[0], rg[1], pin(rg, u) - rg[0], rg[1] - rg[0]]); apply(g, p); if (A && spec.r === 1) { if (aid === 'tree') pre = TREES_N(p) + '的'; else if (A.pre) pre = A.tiers[ti]?.[1] || ''; else suf = A.tiers[ti]?.[1] || ''; } }
+  for (let [aid, ti, p, u] of spec.a || []) {
+    const A0 = AFFIX_BY[aid];
+    if (aw && A0) { const t2 = topTier(A0, aw, spec.r); if (t2 > ti) { ti = t2; const T = A0.tiers[ti]; p = aid === 'tree' ? { fx: { skillTree: { [Object.keys(p.fx?.skillTree || {})[0] || TREE_KEYS[0]]: T[4] ? pin(T[4], u ?? 1) : 1 } } } : T[2](Math.random, u ?? 1); } }
+    const A = AFFIX_BY[aid], rg = A?.tiers[ti]?.[4]; if (u != null && rg && rg[1] > rg[0]) rolls.push(['aff.' + aid, pin(rg, u), rg[0], rg[1], pin(rg, u) - rg[0], rg[1] - rg[0]]); apply(g, p); if (A && spec.r === 1) { if (aid === 'tree') pre = TREES_N(p) + '的'; else if (A.pre) pre = A.tiers[ti]?.[1] || ''; else suf = A.tiers[ti]?.[1] || ''; } }
   const RP = (p) => old ? p : rollPowers(p, U, rolls);
-  if (spec.u) { const u = UNIQUES[spec.u]; apply(g, RP(u.p)); g.name = u.name; g.flavor = u.flavor; g.lvReq = u.lv; g.uniq = spec.u; }
-  else if (spec.s) { const p = SET_ITEMS[spec.s]; apply(g, RP(p.p)); g.name = p.name; g.lootSet = p.set; g.lvReq = p.lv; g.setPiece = spec.s; }
+  if (spec.u) { const u = UNIQUES[spec.u]; apply(g, RP(aw > u.lv ? u.mk(aw) : u.p)); g.name = u.name; g.flavor = u.flavor; g.lvReq = u.lv; g.uniq = spec.u; }
+  else if (spec.s) { const p = SET_ITEMS[spec.s]; apply(g, RP(aw > p.lv ? p.mk(aw) : p.p)); g.name = p.name; g.lootSet = p.set; g.lvReq = p.lv; g.setPiece = spec.s; }
   else if (spec.r === 2) { g.name = spec.n; g.lvReq = Math.max(1, Math.floor(spec.il * 0.7)); }
   else { g.name = (spec.q ? '精良的' : '') + pre + B.name + suf; g.lvReq = spec.r === 1 ? Math.max(1, Math.floor(spec.il * 0.6)) : Math.max(1, B.tier * 6); }
-  g.lvReq = Math.min(90, Math.max(g.lvReq || 1, B.tier * 6 + (B.tier >= 8 ? (B.tier - 7) * 6 : 0)));
+  g.lvReq = Math.min(90, Math.max(g.lvReq || 1, B.tier * 6 + (B.tier >= 8 ? (B.tier - 7) * 6 : 0), aw ? aw - 8 : 0));
   g.color = undefined; g.rarColor = RARITY[spec.r].c;
   // how good the rolls are, 0..1; every one at the top makes a perfect piece (only magic or better counts)
   g.qual = rolls.length ? rolls.reduce((s, x) => s + x[4] / x[5], 0) / rolls.length : null;
@@ -357,7 +400,7 @@ export function build(spec) {
   g.maxed = rolls.length > 0 && rolls.every(x => x[4] === x[5]);
   g.godly = spec.r >= 1 && g.maxed && (spec.pf || rolls.reduce((p, x) => p * (x[5] + 1), 1) >= 100);
   if (g.godly) g.name = '★' + g.name;
-  g.price = Math.round(((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10)) * (g.qual == null ? 1 : 0.8 + g.qual * 0.4) * (g.godly ? 3 : 1));
+  g.price = Math.round(((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10)) * (g.qual == null ? 1 : 0.8 + g.qual * 0.4) * (g.godly ? 3 : 1) * (aw ? 1.5 : 1));
   return g;
 }
 
