@@ -14,6 +14,7 @@ export function makeStory(G) {
     async merchant() { await say('商人 歐德', '要買點什麼？裝備每次你變強就會換一批新貨。', 'merchant'); await G.ui.merchantMenu(); },
     async healer() { healAll(S()); for (const r of S().minions || []) r.hp = r.st.hp; G.audio.sfx('heal'); G.ui.hud(); await say('治療師 艾菈', '傷都治好了。\n去吧，願光照亮你的路。', 'priest'); },
     async recruiter() { await say('傭兵隊長 葛倫', '十種職業的冒險者都在這個營地裡。\n付錢，他們就跟你走。', 'guard'); await G.ui.hireMenu(); },
+    async smith() { await say('鐵匠 布洛克', '強化、鑲寶石、打孔、鑲符文，還有神裝覺醒。\n把東西拿來吧。', 'smith'); await G.ui.smith(9); },
     async gambler() { await say('賭徒 薇拉', '想試試手氣嗎？\n袋子裡是什麼，連我都不知道。', 'lady'); await G.ui.gambleMenu(); },
     async elder() {
       const s = S(), a = nextBoss();

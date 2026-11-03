@@ -355,7 +355,7 @@ export class UI {
     const where = (o) => o.where ? HEROES[o.where[0]].name + '裝備中' : '背包';
     for (;;) {
       const n = runesOwned().reduce((s, r) => s + S.items[r.id], 0);
-      const m = await this.choose([{ label: '鑲嵌符文', sub: `符文 ${n} 顆` }, { label: '打孔', sub: '普通裝備' }, { label: '合成符文', sub: '3 顆 → 高一級' }, { label: '符文之語一覽', sub: Object.keys(RUNEWORDS).length + ' 種' }, { label: '我的符文', sub: n + ' 顆' }], { title: `符文　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>符文</b>從怪物身上掉落，精英、首領和死王宮殿掉得多，也比較容易掉高級符文。</p><p>白色（普通）裝備有時會帶孔掉落，也可以在這裡打孔。把符文依序鑲進孔裡，每顆符文都有自己的效果；<b style="color:#e0c080">正確的符文、正確的順序、剛好填滿正確種類的裝備</b>，就會變成符文之語。</p><p>鑲進去的符文拿不出來。</p>' });
+      const m = await this.choose([{ label: '鑲嵌符文', sub: `符文 ${n} 顆` }, { label: '打孔', sub: '普通裝備' }, { label: '合成符文', sub: '3 顆 → 高一級' }, { label: '符文之語一覽', sub: Object.keys(RUNEWORDS).length + ' 種' }, { label: '我的符文', sub: n + ' 顆' }], { title: `符文　<span class="gil">${S.gil} G</span>`, info: '<p><b>符文</b>從怪物身上掉落，精英、首領和死王宮殿掉得多，也比較容易掉高級符文。</p><p>白色（普通）裝備有時會帶孔掉落，也可以在這裡打孔。把符文依序鑲進孔裡，每顆符文都有自己的效果；<b style="color:#e0c080">正確的符文、正確的順序、剛好填滿正確種類的裝備</b>，就會變成符文之語。</p><p>鑲進去的符文拿不出來。</p>' });
       if (m < 0) return;
       if (m === 0) {
         for (;;) {
@@ -722,7 +722,7 @@ export class UI {
     const owned = () => { const out = []; for (const id of Object.keys(S.items)) if (S.items[id] > 0 && GEAR[id] && GEAR[id].tier != null && GEAR[id].tier <= maxTier) out.push({ id, where: null }); for (const h of Object.keys(S.heroes)) for (const sl of EQUIP_SLOTS) { const g = S.heroes[h].equip[sl]; if (g && GEAR[g] && GEAR[g].tier != null) out.push({ id: g, where: [h, sl] }); } return out; };
     const swap = (o, nid) => { if (o.where) S.heroes[o.where[0]].equip[o.where[1]] = nid; else { addItem(S, o.id, -1); if (S.items[o.id] <= 0) delete S.items[o.id]; addItem(S, nid, 1); } };
     for (;;) {
-      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#e0c080">符文</span>', sub: '孔・符文之語' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, cls: 'small', info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#e0c080">符文</b>：幫普通裝備打孔、鑲嵌符文，做出符文之語。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
+      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#e0c080">符文</span>', sub: '孔・符文之語' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#e0c080">符文</b>：幫普通裝備打孔、鑲嵌符文，做出符文之語。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
       if (m < 0) return;
       if (m === 2) { await this.runeMenu(owned, parse); continue; }
       if (m === 3) { await this.awakenMenu(owned, parse); continue; }

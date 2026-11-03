@@ -37,6 +37,7 @@ export function areaLevel(S, act, lvl) { return Math.min(99, ACTS[act].lv + lvl 
       { k: 'npc', x: 9, z: 7, id: 'healer', look: 'priest', dir: 'down' },
       { k: 'npc', x: 14, z: 6, id: 'recruiter', look: 'guard', dir: 'down' },
       { k: 'npc', x: 24, z: 6, id: 'gambler', look: 'lady', dir: 'down' },
+      { k: 'npc', x: 21, z: 6, id: 'smith', look: 'smith', dir: 'down' },
       { k: 'npc', x: 20, z: 10, id: 'elder', look: 'oldman', dir: 'left' },
       { k: 'stash', x: 8, z: 12, id: 'stash', label: '倉庫' },
       { k: 'lamp', x: 11, z: 11 }, { k: 'lamp', x: 19, z: 11 }, { k: 'lamp', x: 11, z: 17 }, { k: 'lamp', x: 19, z: 17 },
