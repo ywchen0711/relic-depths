@@ -202,74 +202,7 @@ D.pudding = (c) => {
   p.rect(7, 11, 2, 2, '#1c1424'); p.rect(13, 11, 2, 2, '#1c1424'); p.rect(10, 14, 2, 1, '#6a2a2a');
   return p.outline();
 };
-// ---------------------------------------------------------------- the jelly family: round glossy blobs with friendly faces, and
-// what they grow into — stacked in a tower, wearing a shell, spread in a puddle, carrying a little knight, sprouting horns and wings
-const gloss = (p, cx, cy, rx, ry) => { p.set(cx - rx * 0.55, cy - ry * 0.55, '#ffffff'); p.set(cx - rx * 0.55 + 1, cy - ry * 0.55, '#ffffff'); p.set(cx - rx * 0.55, cy - ry * 0.55 + 1, '#fff8e8'); p.set(cx - rx * 0.2, cy - ry * 0.75, '#fff8e8'); };
-const jface = (p, cx, cy, R, c = {}) => {
-  const e = c.eye || '#1c1424';
-  p.rect(cx - 3, cy - 1, 2, 2, e); p.rect(cx + 2, cy - 1, 2, 2, e); p.set(cx - 3, cy - 1, '#fff'); p.set(cx + 2, cy - 1, '#fff');
-  p.rect(cx - 1, cy + 2, 3, 1, '#5a1a2a'); p.set(cx - 2, cy + 1, '#5a1a2a'); p.set(cx + 2, cy + 1, '#5a1a2a'); p.set(cx, cy + 3, '#e86a8a');
-  if (c.blush) { p.set(cx - 4, cy + 1, '#ff9ab0'); p.set(cx + 4, cy + 1, '#ff9ab0'); }
-};
-const blob = (p, cx, cy, rx, ry, col, c) => { const R = ramp(col); p.sell(cx, cy, rx, ry, R); p.rect(Math.round(cx - rx * 0.8), Math.round(cy + ry - 1), Math.round(rx * 1.6), 1, R[2]); gloss(p, cx, cy, rx, ry); jface(p, Math.round(cx), Math.round(cy), R, c); return R; };
-D.gelstack = (c) => { // three jellies stacked up, each a different colour
-  const p = new Px(24, 34);
-  blob(p, 12, 27, 9.5, 6, c.c || '#4a9ae8', c); blob(p, 12, 17.5, 8, 5, c.b || '#ff7a3a', c); blob(p, 12, 8.5, 6.5, 4.5, c.body || '#5ad84a', c);
-  if (c.crown) { p.rect(9, 1, 7, 3, '#e8c050'); p.set(9, 0, '#e8c050'); p.set(12, 0, '#e8c050'); p.set(15, 0, '#e8c050'); p.set(12, 2, '#d84a4a'); }
-  return p.outline();
-};
-D.shellgel = (c) => { // a jelly wearing a spiral shell like a helmet
-  const p = new Px(26, 24), S = ramp(c.shell || '#a8783a');
-  blob(p, 13, 17, 9.5, 6, c.body || '#6ad85a', c);
-  p.sell(13, 9, 9, 5.5, S); p.rect(4, 12, 18, 2, S[2]);
-  for (let i = 0; i < 14; i++) { const a = i * 0.55, r = 4.5 - i * 0.3; p.set(13 + Math.cos(a) * r * 1.4, 8.5 + Math.sin(a) * r * 0.8, S[2]); }
-  for (const x of [6, 11, 16, 20]) { p.set(x, 4 + (x % 3), S[0]); p.set(x, 3 + (x % 3), S[0]); }
-  return p.outline();
-};
-D.puddle = (c) => { // a jelly spread flat in a puddle, blowing bubbles
-  const p = new Px(28, 20), R = ramp(c.body || '#6ad84a');
-  p.sell(14, 16, 13, 3.5, R); p.sell(14, 12, 7.5, 4.5, R); gloss(p, 14, 12, 7.5, 4.5); jface(p, 14, 12, R, c);
-  for (const [x, y, r] of [[5, 6, 1.6], [21, 4, 2.2], [15, 1.5, 1.2], [24, 9, 1]]) { p.ell(x, y, r, r, R[0]); p.set(x - r * 0.4, y - r * 0.4, '#fff'); }
-  return p.outline();
-};
-D.rootling = (c) => { // a turnip spirit: a round root with a sprout on its head, little root arms and feet
-  const p = new Px(22, 26), R = ramp(c.body || '#6a3a5a'), L = ramp(c.leaf || '#5ac84a'), W = ramp(c.root || '#c8a070');
-  p.line(8, 20, 6, 25, W[1]); p.line(13, 20, 15, 25, W[1]); p.line(5, 25, 7, 25, W[2]); p.line(14, 25, 16, 25, W[2]);
-  p.line(4, 13, 1, 17, W[1]); p.line(17, 13, 20, 17, W[1]);
-  p.sell(10.5, 14, 7, 7, R); gloss(p, 10.5, 14, 7, 7);
-  for (let i = 0; i < 3; i++) p.set(7 + i * 3, 19 - (i % 2), R[2]);
-  p.line(10, 7, 10, 4, L[2]); p.sell(7, 3, 3.5, 1.8, L); p.sell(14, 2.5, 3.5, 1.8, L); p.line(5, 3, 9, 3, L[2]); p.line(12, 2, 16, 2, L[2]);
-  // big round eyes
-  for (const x of [7, 13]) { p.ell(x, 13, 2, 2.2, '#fff8e8'); p.rect(x - 1, 13, 2, 2, c.eye || '#1c1424'); p.set(x - 1, 12, '#fff'); }
-  p.rect(9, 17, 3, 1, '#2a0a1a'); p.set(10, 18, '#e86a8a');
-  return p.outline();
-};
-D.gelknight = (c) => { // a little armoured knight riding a big jelly
-  const p = new Px(30, 34), A = ramp(c.armor || '#a8b0c8'), G = ramp(c.gold || '#e8c050');
-  blob(p, 15, 26, 12, 7, c.body || '#5ad84a', c);
-  p.srect(12, 16, 3, 4, A); p.srect(17, 16, 3, 4, A);                // legs astride
-  p.srect(11, 9, 10, 8, A); p.rect(11, 13, 10, 1, G[1]);              // breastplate and belt
-  p.sell(16, 6, 4, 4, A); p.rect(13, 6, 6, 1, '#1c1424'); p.set(16, 7, '#1c1424'); // helmet, visor
-  p.line(16, 2, 20, 0, c.plume || '#e84a4a'); p.line(16, 1, 21, 1, c.plume || '#e84a4a');
-  p.srect(5, 9, 6, 8, G); p.rect(7, 11, 2, 4, c.crest || '#d84a4a'); p.rect(6, 12, 4, 2, c.crest || '#d84a4a'); // shield
-  p.line(24, 2, 24, 13, '#e8eef8'); p.line(25, 2, 25, 12, '#a8b0c8'); p.rect(22, 13, 5, 1, G[1]); p.rect(24, 14, 2, 2, '#6a4a2a'); // sword
-  return p.outline();
-};
-D.wyrmgel = (c) => { // a jelly that has grown dragon's horns, small wings and a curling tail
-  const p = new Px(30, 26), H = ramp(c.horn || '#fff0c0'), W = ramp(c.wing || shade(c.body || '#f0b02a', -0.2));
-  // bat-like wings: filled fans with dark ribs
-  // bat-like wings spread out from the sides: filled, with dark ribs and a scalloped edge
-  const wing = (sx, dir) => {
-    for (let y = 3; y <= 14; y++) { const len = Math.round(y <= 9 ? 2 + (y - 3) * 1.0 : 8 - (y - 9) * 1.2) - (y >= 10 && y % 2 ? 1 : 0); for (let k = 0; k < len; k++) p.set(sx - dir * k, y, k > len - 2 ? W[2] : y < 6 ? W[0] : W[1]); }
-    for (const t of [4, 8, 12]) p.line(sx, 12, sx - dir * 7, t, W[2]);
-  };
-  wing(7, 1); wing(23, -1);
-  const R = blob(p, 15, 16, 9.5, 7.5, c.body || '#f0b02a', c);
-  p.line(21, 21, 26, 21, R[1]); p.line(26, 21, 27, 18, R[1]); p.set(26, 17, R[0]);
-  p.line(10, 10, 7, 3, H[1]); p.line(11, 10, 8, 3, H[0]); p.line(20, 10, 23, 3, H[1]); p.line(19, 10, 22, 3, H[2]);
-  p.set(13, 20, '#fff'); p.set(17, 20, '#fff');                        // two little fangs
-  return p.outline();
-};
+// (the jelly family — gelstack, shellgel, puddle, rootling, gelknight, wyrmgel — is drawn in beasts.js at the higher resolution)
 for (const [k, f] of Object.entries(D)) registerMonster(k, f);
 
 // ---------------------------------------------------------------- new enemy skills

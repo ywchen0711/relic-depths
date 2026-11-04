@@ -661,4 +661,94 @@ M.mech = (c) => {
   return p.outline();
 };
 
+// ---------------------------------------------------------------- the jelly family, drawn clean and symmetric: every body is
+// centred on a pixel edge so the two halves match, the faces are the same on every jelly, limbs and wings are mirrored
+const mirror = (pts, W) => pts.map(([x, y]) => [W - x, y]);
+function jelly(p, cx, cy, rx, ry, col, c = {}) {
+  const R = ramp(col);
+  p.sell(cx, cy, rx, ry, R);
+  p.rect(cx - Math.round(rx * 0.72), cy + ry - 2, Math.round(rx * 0.72) * 2, 2, R[2]);            // a flat, shaded foot
+  p.sell(cx - rx * 0.45, cy - ry * 0.45, Math.max(2, rx * 0.2), Math.max(1.5, ry * 0.2), ramp(shade(col, 0.5))); // the shine
+  p.set(Math.round(cx - rx * 0.5), Math.round(cy - ry * 0.55), '#ffffff'); p.set(Math.round(cx - rx * 0.5) + 1, Math.round(cy - ry * 0.55), '#ffffff');
+  jellyFace(p, cx, cy + Math.round(ry * 0.1), Math.max(2.2, Math.min(3.2, rx * 0.17)), c);
+  return R;
+}
+function jellyFace(p, cx, cy, r, c = {}) {
+  // eyes are drawn as fixed pixel shapes (an ellipse this small comes out lumpy): rounded whites, a tall pupil, one glint
+  const big = r >= 2.8, ew = big ? 6 : 4, eh = big ? 7 : 5, gap = big ? 4 : 3, pc = c.eye || '#2a2a5a';
+  for (const x0 of [cx - gap - ew, cx + gap]) {
+    const y0 = cy - Math.floor(eh / 2);
+    p.rect(x0, y0 + 1, ew, eh - 2, '#fff8ec'); p.rect(x0 + 1, y0, ew - 2, eh, '#fff8ec');
+    const pw = big ? 3 : 2, ph = big ? 4 : 3, px0 = x0 + Math.floor((ew - pw) / 2), py0 = y0 + Math.floor((eh - ph) / 2) + 1;
+    p.rect(px0, py0, pw, ph, pc); p.set(px0, py0, '#ffffff');
+  }
+  const my = cy + Math.ceil(eh / 2) + 1;
+  p.rect(cx - 2, my + 1, 4, 1, '#3a1a2a'); p.set(cx - 3, my, '#3a1a2a'); p.set(cx + 2, my, '#3a1a2a'); // a small smile
+  p.rect(cx - 1, my + 2, 2, 1, '#e8708a');
+  if (c.blush) for (const x of [cx - gap - ew - 1, cx + gap + ew - 1]) p.rect(x, my - 1, 2, 1, '#ff9ab0');
+}
+M.gelstack = (c) => { // three jellies piled into a tower
+  const p = P(48, 70);
+  jelly(p, 24, 56, 19, 12, c.c || '#4a9ae8', c);
+  jelly(p, 24, 36, 16, 10.5, c.b || '#ff7a3a', c);
+  jelly(p, 24, 18, 13, 9, c.body || '#5ad84a', c);
+  if (c.crown) { poly(p, [[16, 10], [16, 3], [20, 6], [24, 1], [28, 6], [32, 3], [32, 10]], ramp('#e8c050')); p.ell(24, 7, 1.6, 1.6, '#d84a4a'); }
+  return p.outline();
+};
+M.shellgel = (c) => { // a jelly wearing a spiral shell like a helmet
+  const p = P(48, 48), S = ramp(c.shell || '#a8783a');
+  jelly(p, 24, 34, 19, 12, c.body || '#6ad85a', c);
+  for (const x of [13, 24, 35]) poly(p, [[x - 3, 12], [x, 3], [x + 3, 12]], S);   // three little spikes
+  p.sell(24, 17, 17, 10, S); p.rect(7, 24, 34, 3, S[2]); p.rect(7, 24, 34, 1, S[1]);
+  for (const r of [9, 5.5, 2.2]) for (let y = 7; y < 26; y++) for (let x = 6; x < 42; x++) { const d = Math.hypot((x + 0.5 - 24) / 1.6, y + 0.5 - 16.5); if (Math.abs(d - r) < 0.55 && p.get(x, y)) p.set(x, y, S[2]); }
+  return p.outline();
+};
+M.puddle = (c) => { // a jelly spread flat in a puddle, blowing bubbles
+  const p = P(56, 40), R = ramp(c.body || '#6ad84a');
+  p.sell(28, 33, 26, 6, R); p.rect(6, 37, 44, 1, R[2]);
+  jelly(p, 28, 25, 15, 10, c.body || '#6ad84a', c);
+  for (const [x, y, r] of [[9, 12, 3.2], [47, 9, 4], [33, 4, 2.2], [50, 21, 2]]) { p.ell(x, y, r, r, R[0]); p.ell(x, y, Math.max(0.6, r - 1.2), Math.max(0.6, r - 1.2), shade(c.body || '#6ad84a', 0.65)); p.set(Math.round(x - r * 0.4), Math.round(y - r * 0.4), '#ffffff'); }
+  return p.outline();
+};
+M.rootling = (c) => { // a turnip spirit: a round root with a sprout, little arms and feet
+  const p = P(44, 54), R = ramp(c.body || '#6a3a5a'), L = ramp(c.leaf || '#5ac84a'), W = ramp(c.root || '#c8a070');
+  for (const s of [1, -1]) {                                   // arms and legs, the same on both sides
+    const X = (x) => s > 0 ? x : 44 - x;
+    limb(p, X(10), 30, X(3), 37, 1.8, 1.3, W); p.ell(X(3), 38, 1.6, 1.4, W[1]);
+    limb(p, X(16), 40, X(14), 49, 2.2, 1.8, W); p.ell(X(13), 50, 3, 1.6, W[1]);
+  }
+  p.sell(22, 28, 14, 14, R);
+  p.sell(16, 21, 3, 3.5, ramp(shade(c.body || '#6a3a5a', 0.45))); p.set(15, 19, '#ffffff'); p.set(16, 19, '#ffffff');
+  for (const x of [15, 20, 25]) p.rect(x, 39, 4, 1, R[2]);    // root rings near the bottom
+  limb(p, 22, 15, 22, 8, 1.3, 1.1, L[2]);
+  const leaf = [[22, 9], [16, 3], [9, 4], [15, 9]]; poly(p, leaf, L); poly(p, mirror(leaf, 44), L);
+  limb(p, 21, 8, 12, 5, 0.5, 0.5, L[2]); limb(p, 23, 8, 32, 5, 0.5, 0.5, L[2]);
+  jellyFace(p, 22, 27, 3.2, c);
+  return p.outline();
+};
+M.gelknight = (c) => { // a little armoured knight riding a big jelly
+  const p = P(60, 70), A = ramp(c.armor || '#a8b0c8'), G = ramp(c.gold || '#e8c050');
+  jelly(p, 30, 54, 24, 14, c.body || '#5ad84a', c);
+  limb(p, 25, 38, 21, 45, 2.4, 2, A); limb(p, 35, 38, 39, 45, 2.4, 2, A);       // legs astride
+  poly(p, [[22, 24], [38, 24], [38, 39], [22, 39]], A); p.rect(22, 33, 16, 2, G[1]); p.rect(29, 33, 2, 2, G[0]); // body, belt
+  p.sell(30, 16, 7.5, 7.5, A); p.rect(23, 15, 14, 2, '#1c1424'); p.rect(29, 17, 2, 3, '#1c1424'); // helmet with a visor
+  chain(p, [[30, 9], [33, 5], [38, 4]], 1.8, 1.2, ramp(c.plume || '#e84a4a'));
+  limb(p, 38, 27, 44, 30, 2, 1.8, A);                                             // sword arm
+  p.rect(44, 4, 4, 24, '#e8eef8'); p.rect(44, 4, 1, 24, '#ffffff'); p.rect(47, 4, 1, 24, '#a8b0c8'); p.rect(45, 2, 2, 2, '#e8eef8');
+  p.rect(40, 27, 12, 2, G[1]); p.rect(45, 29, 2, 5, '#6a4a2a');
+  poly(p, [[8, 22], [20, 22], [20, 34], [14, 40], [8, 34]], G);                  // shield
+  p.rect(13, 25, 2, 10, c.crest || '#d84a4a'); p.rect(10, 28, 8, 2, c.crest || '#d84a4a');
+  return p.outline();
+};
+M.wyrmgel = (c) => { // a jelly that has grown dragon's horns, bat wings and a curling tail
+  const p = P(60, 54), body = c.body || '#f0b02a', Wg = ramp(c.wing || shade(body, -0.22)), H = ramp(c.horn || '#fff0c0');
+  const wing = [[18, 30], [3, 10], [7, 17], [3, 22], [9, 24], [6, 30], [13, 33]];
+  poly(p, wing, Wg); poly(p, mirror(wing, 60), Wg);
+  for (const [a, b] of [[[17, 29], [4, 12]], [[16, 30], [5, 22]], [[16, 31], [7, 30]]]) { limb(p, a[0], a[1], b[0], b[1], 0.6, 0.5, Wg[2]); limb(p, 60 - a[0], a[1], 60 - b[0], b[1], 0.6, 0.5, Wg[2]); }
+  chain(p, [[44, 46], [52, 46], [56, 41], [54, 37]], 2.6, 1.2, ramp(body));
+  jelly(p, 30, 35, 18, 14, body, c);
+  limb(p, 22, 23, 17, 9, 2.4, 0.8, H); limb(p, 38, 23, 43, 9, 2.4, 0.8, H);      // horns
+  p.rect(26, 45, 1, 2, '#ffffff'); p.rect(33, 45, 1, 2, '#ffffff');                // two little fangs
+  return p.outline();
+};
 for (const [k, f] of Object.entries(M)) registerMonster(k, f);
