@@ -12,6 +12,7 @@ import './menus.js?v=1';
 import { autoBuild } from './menus.js?v=1';
 import { restoreLoot, rollItem, dropLoot } from './loot.js?v=1';
 import { genRift, riftId, RIFT_AFX } from './rift.js?v=1';
+import { tick as bountyTick } from './bounty.js?v=1';
 import { genLevel, parseId, rollTroop, ACTS, WP_LEVELS, mapId, DIFFS, genPalace, parsePalace, palaceId } from './dungeon.js?v=1';
 import { CLASSES } from './classes.js?v=1';
 import { MAPS } from './maps.js?v=1';
@@ -129,6 +130,8 @@ class Game {
   mapName() { return this.field.def?.name || ''; }
   npcBubble(def) { return this.story.bubble(def); }
   moguActive(id) { return this.S.quests.q_mogu === 'taken' && !this.S.mogu.includes(id); }
+  // the bounty board: count progress, and say when a task is done
+  bountyTick(ev) { for (const b of bountyTick(this.S, ev)) this.ui.toast('<span style="color:#ffd86a">委託完成！回營地找委託人領獎</span>', 3000); }
   updateObjective() { this.ui.objective(this.story.objectiveText()); }
   canSave() { return true; }
   nearSave() { const p = this.field.player; return this.field.built.interact.some(it => it.kind === 'save' && Math.hypot(it.c.i + 0.5 - p.x, it.c.j + 0.5 - p.z) < 2.2); }
@@ -260,6 +263,7 @@ class Game {
     if (o.portal) this.S.portal = null;
     // the palace: remember how deep you have been, and what you carried when you went down (see palaceDeath)
     const pf = parsePalace(to);
+    if (pf && parsePalace(this.field.mapId) === pf - 1) this.bountyTick({ floor: 1 });
     if (pf) { this.S.palace = { open: 1, best: 0, ...(this.S.palace || {}) }; this.S.palace.best = Math.max(this.S.palace.best, pf); if (!this.S.prun) this.S.prun = { before: this.owned() }; }
     if (to === 'town') this.S.prun = null; // back on the surface: everything found is safe
     this.ensureMap(to);
@@ -313,6 +317,7 @@ class Game {
   async randomBattle(enc) {
     if (this.busy || this.mode !== 'field') return;
     const T = rollTroop(this.S, this.field.def);
+    if (!this.field.def.town && this.field.def.alv && Math.random() < 0.02) { T.troop = ['tgoblin']; T.mods = [{ rank: 0, lv: this.field.def.alv, mods: [] }]; T.kind = 'goblin'; this.ui.toast('<span style="color:#ffe08a">寶藏哥布林出現了！在牠逃走前打倒牠</span>', 3000); }
     if (T.kind === 'unique') this.ui.toast(`<span style="color:#e8b040">獨特怪物出現了！</span>`);
     const res = await this.fight({ troop: T.troop, mods: T.mods, bg: this.bgFor(), preemptive: Math.random() < 0.1, random: true, pw: this.field.def.pw, lootQ: this.field.def.lootQ, rift: this.field.def.rift });
     if (this.grind) await this.grind.afterBattle(res, this.battle.lastSpoils);

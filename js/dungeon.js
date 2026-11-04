@@ -40,6 +40,7 @@ export function areaLevel(S, act, lvl) { return Math.min(99, ACTS[act].lv + lvl 
       { k: 'npc', x: 21, z: 6, id: 'smith', look: 'smith', dir: 'down' },
       { k: 'npc', x: 20, z: 10, id: 'elder', look: 'oldman', dir: 'left' },
       { k: 'stash', x: 8, z: 12, id: 'stash', label: '倉庫' },
+      { k: 'npc', x: 24, z: 11, id: 'bounty', look: 'watchman', dir: 'left' },
       { k: 'lamp', x: 11, z: 11 }, { k: 'lamp', x: 19, z: 11 }, { k: 'lamp', x: 11, z: 17 }, { k: 'lamp', x: 19, z: 17 },
       { k: 'barrel', x: 3, z: 8 }, { k: 'crate', x: 4, z: 9 }, { k: 'barrel', x: 26, z: 8 }, { k: 'flowers', x: 7, z: 15 }, { k: 'flowers', x: 23, z: 15 },
       { k: 'warp', x: 13, z: 24, w: 5, d: 1, to: mapId(0, 0), tx: -1, tz: -1, dir: 'up', label: '前往地城' },
@@ -188,6 +189,8 @@ export const palacePower = (f) => ({ hp: 1 + f * 0.04, atk: 1 + f * 0.015, def: 
 export const palaceLootQ = (f) => 1.5 + f * 0.035; // how much likelier the good things are: floor 1 x1.5, floor 100 x5
 export const palaceBoss = (f) => f >= PALACE_N ? 'deadking' : ACTS[(f / 10 - 1) % ACTS.length].boss;
 ENEMIES.deadking = { ...ENEMIES.abyss, name: '死王', kind: 'lord', colors: { body: '#2a1a1e', trim: '#e8c050', halo: '#ff4a3a', eye: '#ff3a3a' }, weak: ['light', 'fire', 'sword'], resist: ['dark', 'ice'], acts: [['e_void', 2], ['e_dark', 2], ['e_silence_all', 1], ['e_tidal', 1]], exp: 40000, gil: 50000, drops: [], scale: 1.5, twice: 1 };
+// the treasure goblin: turns up now and then in any dungeon, runs off after three turns, and spills treasure if caught
+ENEMIES.tgoblin = { ...ENEMIES.bandit, name: '寶藏哥布林', colors: { body: '#e8c050', cloth: '#6a3a8a', hat: '#ffe08a' }, hp: 700, def: 16, spd: 15, shield: 2, weak: ['sword', 'bow', 'thunder', 'ice'], traits: ['flee'], acts: [['e_tackle', 1]], exp: 60, gil: 600, drops: [], scale: 1.15 };
 const PAL_LOOK = ['4_2', '0_3', '4_0', '2_3', '4_1'], PAL_HAB = ['cave', 'temple', 'void', 'forest', 'mountain', 'coast', 'sky'];
 export function genPalace(S, f, seed) {
   const look = LOOK[PAL_LOOK[Math.min(4, Math.floor((f - 1) / 20))]];

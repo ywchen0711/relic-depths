@@ -1455,6 +1455,9 @@ export class Battle {
     const keys = [], fl = this.G.field?.def?.floor || 0;
     if (fl || this.opts.rift) for (const u of killed) { const k = keyDrop(this.S, { floor: fl, rift: this.opts.rift, rank: u.rank, boss: u.E.boss || this.opts.boss }); if (k) keys.push(k); }
     if (keys.length) (this.S.keys ||= []).push(...keys);
+    // the treasure goblin spills what it carried
+    if (killed.some(u => u.id === 'tgoblin')) { const g = killed.find(u => u.id === 'tgoblin'), il = g.lootLv || g.lv; for (let i = 0, n = 4 + Math.floor(Math.random() * 3); i < n; i++) { const x = rollItem(this.S, il, { mf: mf + 100, quality: 2 * LQ, minRarity: 1 }); addItem(this.S, x, 1); loot.push(x); } gil += Math.round(il * il * 3 * rich); for (let i = 0; i < 2; i++) { const rn = rollRune(il, 2 + (LQ - 1) * 1.5); addItem(this.S, rn, 1); runes.push(rn); } }
+    { const d = this.G.field?.def; this.G.bountyTick?.({ kills: killed, round: this.round, heat: H, act: d && !d.town && !d.floor && !d.rift && d.lvl != null ? d.act : -1, goblin: killed.some(u => u.id === 'tgoblin') }); }
     this.S.gil += gil;
     const { gainExp } = await import('./party.js?v=1');
     const ups = gainExp(this.S, exp);

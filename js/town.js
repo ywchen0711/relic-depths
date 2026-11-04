@@ -1,6 +1,7 @@
 // The people of the camp and the act bosses. Same shape as Crystal Echoes' story module (TALK, EV, board...),
 // but there is no script to follow: the goal is always the next act's boss, and better loot.
 import { riftBoss, rollKey, keyLine } from './rift.js?v=1';
+import { bountyFresh, bountyText, prizeText, claim } from './bounty.js?v=1';
 import { HEROES, ENEMIES } from './data.js?v=1';
 import { healAll, addItem } from './party.js?v=1';
 import { ACTS, DIFFS, areaLevel, mapId, palaceBoss, PALACE_N } from './dungeon.js?v=1';
@@ -16,6 +17,22 @@ export function makeStory(G) {
     async healer() { healAll(S()); for (const r of S().minions || []) r.hp = r.st.hp; G.audio.sfx('heal'); G.ui.hud(); await say('治療師 艾菈', '傷都治好了。\n去吧，願光照亮你的路。', 'priest'); },
     async recruiter() { await say('傭兵隊長 葛倫', '十種職業的冒險者都在這個營地裡。\n付錢，他們就跟你走。', 'guard'); await G.ui.hireMenu(); },
     async smith() { await say('鐵匠 布洛克', '強化、鑲寶石、打孔、鑲符文，還有神裝覺醒。\n把東西拿來吧。', 'smith'); await G.ui.smith(9); },
+    // the bounty board: three tasks, each paying gold and one more thing
+    async bounty() {
+      const s = S(); bountyFresh(s);
+      await say('委託人 羅恩', '營地的人都有麻煩事。\n幫個忙，報酬不會少給你。', 'watchman');
+      for (;;) {
+        const B = bountyFresh(s), list = B.list;
+        const i = await G.ui.choose(list.map(b => ({ label: b.claimed ? `<span class="dim">✔ ${bountyText(b)}</span>` : b.have >= b.n ? `<span style="color:#ffd86a">★ ${bountyText(b)}</span>` : bountyText(b), sub: b.claimed ? '已領取' : b.have >= b.n ? '可以領獎' : `${b.have}/${b.n}` })), { title: '委託板', info: (k) => `<div class="gi"><h4>${bountyText(list[k])}</h4><div>進度：${list[k].have}/${list[k].n}</div><div style="color:#ffe04a">報酬：${prizeText(list[k])}</div><p class="dim">三個委託都領完，或是過了一天，就會換一批新的。</p></div>` });
+        if (i < 0) return;
+        const b = list[i];
+        if (b.claimed) continue;
+        if (b.have < b.n) { G.ui.toast('還沒完成'); continue; }
+        const got = claim(s, b, addItem); G.audio.sfx('levelup'); G.ui.hud(); G.field.refreshBubbles?.();
+        await say('委託人 羅恩', `幹得好！這是報酬：
+${got}`, 'watchman');
+      }
+    },
     async gambler() { await say('賭徒 薇拉', '想試試手氣嗎？\n袋子裡是什麼，連我都不知道。', 'lady'); await G.ui.gambleMenu(); },
     async elder() {
       const s = S(), a = nextBoss();
@@ -37,7 +54,7 @@ export function makeStory(G) {
       const res = await G.fight({ troop: [id], mods: [{ rank: 0, lv: 99, mods: [] }], bg: G.bgFor(), noFlee: true, boss: true, music: 'boss', pw: def.pw, lootQ: def.lootQ, rift: k });
       if (res !== 'win') return;
       def.bossDone = true; G.updateObjective();
-      s.riftBest = Math.max(s.riftBest || 0, k.t); s.riftWon = (s.riftWon || 0) + 1;
+      G.bountyTick({ rift: 1 }); s.riftBest = Math.max(s.riftBest || 0, k.t); s.riftWon = (s.riftWon || 0) + 1;
       const more = [rollKey(k.t + 1), ...(Math.random() < 0.5 ? [rollKey(k.t)] : [])]; (s.keys ||= []).push(...more);
       await say('', `秘境第 ${k.t} 階完成了！
 守護者留下了：
@@ -64,7 +81,7 @@ ${more.map(x => `🗝 第 ${x.t} 階鑰匙（${keyLine(x)}）`).join('\n')}`, nu
       await say('', `一股巨大的氣息逼近……\n「${A.bossN}」出現了！`, null);
       const res = await G.fight({ troop: [A.boss], mods: [{ rank: 0, lv, mods: [] }], bg: G.bgFor(), noFlee: true, boss: true, music: 'boss' });
       if (res !== 'win') return;
-      G.field.def.bossDone = true;
+      G.field.def.bossDone = true; G.bountyTick({ boss: act });
       const first = !s.cleared[key]; s.cleared[key] = 1;
       if (act + 1 < ACTS.length) s.wp[`d${s.diff}a${act + 1}l0`] = 1;
       else if ((s.maxDiff || 0) <= s.diff && s.diff < 2) { s.maxDiff = s.diff + 1; }
@@ -77,7 +94,7 @@ ${more.map(x => `🗝 第 ${x.t} 階鑰匙（${keyLine(x)}）`).join('\n')}`, nu
   };
   return {
     TALK, EV, SIGNS: {}, SPOT_EVENTS: {},
-    bubble(def) { return def.id === 'elder' && nextBoss() >= 0 ? '!' : null; },
+    bubble(def) { if (def.id === 'bounty') return S().bounty?.list.some(b => !b.claimed && b.have >= b.n) ? '!' : null; return def.id === 'elder' && nextBoss() >= 0 ? '!' : null; },
     objectiveText() { const d = G.field?.def; if (d?.rift) return `秘境 第${d.rift.t}階：${d.bossDone ? '完成了！從入口回營地' : '走到盡頭，打倒守護者'}`; if (d?.floor) return `死王宮殿 第${d.floor}層：${d.floor % 10 === 0 && !d.bossDone ? (d.floor >= PALACE_N ? '打倒死王' : '打倒守護者，打開往下的門') : '找到往下的門（入口可以返回地面）'}`;
       const a = nextBoss(); return a < 0 ? '' : `目標：打倒 ${ACTS[a].n.split('　')[0]}首領「${ACTS[a].bossN}」`; },
     async board(id) { if (id === 'stash') await G.ui.stashMenu(); },
