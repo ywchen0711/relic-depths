@@ -661,94 +661,140 @@ M.mech = (c) => {
   return p.outline();
 };
 
-// ---------------------------------------------------------------- the jelly family, drawn clean and symmetric: every body is
-// centred on a pixel edge so the two halves match, the faces are the same on every jelly, limbs and wings are mirrored
+// ---------------------------------------------------------------- the jelly family. Soft gumdrop bodies that glow from inside like
+// real jelly, outlined in their own darker colour instead of black; big shiny eyes, blushing cheeks and a different
+// expression for each. Everything is centred on a pixel edge and mirrored, so the two halves always match.
 const mirror = (pts, W) => pts.map(([x, y]) => [W - x, y]);
-function jelly(p, cx, cy, rx, ry, col, c = {}) {
-  const R = ramp(col);
-  p.sell(cx, cy, rx, ry, R);
-  p.rect(cx - Math.round(rx * 0.72), cy + ry - 2, Math.round(rx * 0.72) * 2, 2, R[2]);            // a flat, shaded foot
-  p.sell(cx - rx * 0.45, cy - ry * 0.45, Math.max(2, rx * 0.2), Math.max(1.5, ry * 0.2), ramp(shade(col, 0.5))); // the shine
-  p.set(Math.round(cx - rx * 0.5), Math.round(cy - ry * 0.55), '#ffffff'); p.set(Math.round(cx - rx * 0.5) + 1, Math.round(cy - ry * 0.55), '#ffffff');
-  jellyFace(p, cx, cy + Math.round(ry * 0.1), Math.max(2.2, Math.min(3.2, rx * 0.17)), c);
-  return R;
+const tone = (col) => ({ hi: mix(shade(col, 0.5), '#ffffff', 0.25), lt: shade(col, 0.22), md: col, dk: shade(col, -0.22), dd: shade(col, -0.42), core: mix(shade(col, 0.35), '#ffffff', 0.1), ol: mix(shade(col, -0.62), '#1c1424', 0.35) });
+// is (x, y) inside a gumdrop: round on top, full and flat at the foot
+const inGum = (x, y, cx, cy, rx, ry) => { const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry; if (dy > 0.92) return false; return dy < 0 ? dx * dx + dy * dy <= 1 : Math.pow(Math.abs(dx), 2.6) + Math.pow(dy, 2.6) <= 1; };
+function gum(p, cx, cy, rx, ry, col, o = {}) {
+  const T = tone(col), cells = [];
+  for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) if (inGum(x, y, cx, cy, rx, ry)) cells.push([x, y]);
+  for (const [x, y] of cells) {
+    const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, l = -dx * 0.55 - dy * 0.75;
+    const edge = !inGum(x - 2, y, cx, cy, rx, ry) || !inGum(x + 2, y, cx, cy, rx, ry) || !inGum(x, y + 2, cx, cy, rx, ry);
+    const coreD = Math.hypot(dx * 1.1, (dy - 0.25) * 1.3);
+    let c = l > 0.55 ? T.lt : l < -0.45 ? T.dk : T.md;
+    if (coreD < 0.45 && !edge && o.core !== false) c = mix(c, T.core, 0.55);           // the glow inside
+    if (dy > 0.7) c = T.dk; if (dy > 0.82) c = T.dd;               // the foot in shadow
+    if (edge && dx > 0.2 && dy > -0.2) c = T.dd;                   // shadowed rim on the lower right
+    if (edge && dx < -0.3 && dy < 0.4) c = T.lt;                   // light rim on the upper left
+    p.set(x, y, c);
+  }
+  // the gloss: a soft bean of light and a sparkle
+  const gx = Math.round(cx - rx * 0.5), gy = Math.round(cy - ry * 0.55), gw = Math.max(2, Math.round(rx * 0.22)), gh = Math.max(2, Math.round(ry * 0.2));
+  p.ell(gx, gy, gw, gh, T.hi); p.ell(gx - 0.5, gy - 0.5, Math.max(1, gw - 1.2), Math.max(0.8, gh - 1.2), '#ffffff');
+  p.set(gx + gw + 2, gy - 1, '#ffffff');
+  return T;
 }
-function jellyFace(p, cx, cy, r, c = {}) {
-  // eyes are drawn as fixed pixel shapes (an ellipse this small comes out lumpy): rounded whites, a tall pupil, one glint
-  const big = r >= 2.8, ew = big ? 6 : 4, eh = big ? 7 : 5, gap = big ? 4 : 3, pc = c.eye || '#2a2a5a';
-  for (const x0 of [cx - gap - ew, cx + gap]) {
+// faces: big dark eyes with two glints, pink cheeks, a cat mouth. kind: normal | happy (^ ^) | brave (brows) | sleepy | wide
+function face(p, cx, cy, size, kind = 'normal', c = {}) {
+  const big = size >= 2, ew = big ? 5 : 4, eh = big ? 7 : 5, gap = big ? 4 : 3, pc = c.eye || '#2a1838';
+  for (const [x0, s] of [[cx - gap - ew, -1], [cx + gap, 1]]) {
     const y0 = cy - Math.floor(eh / 2);
-    p.rect(x0, y0 + 1, ew, eh - 2, '#fff8ec'); p.rect(x0 + 1, y0, ew - 2, eh, '#fff8ec');
-    const pw = big ? 3 : 2, ph = big ? 4 : 3, px0 = x0 + Math.floor((ew - pw) / 2), py0 = y0 + Math.floor((eh - ph) / 2) + 1;
-    p.rect(px0, py0, pw, ph, pc); p.set(px0, py0, '#ffffff');
+    if (kind === 'happy') { // closed, smiling eyes: an arch
+      for (let i = 0; i < ew; i++) p.set(x0 + i, y0 + 2 + (i === 0 || i === ew - 1 ? 1 : 0), pc); p.set(x0 + 1, y0 + 1, pc); p.set(x0 + ew - 2, y0 + 1, pc);
+      continue;
+    }
+    if (kind === 'sleepy') { p.rect(x0, y0 + Math.floor(eh / 2), ew, 1, pc); p.rect(x0 + 1, y0 + Math.floor(eh / 2) + 1, ew - 2, 1, pc); continue; }
+    p.rect(x0 + 1, y0, ew - 2, eh, pc); p.rect(x0, y0 + 1, ew, eh - 2, pc);
+    if (big) { p.rect(x0 + 1, y0 + 1, 2, 2, '#ffffff'); p.set(x0 + ew - 2, y0 + eh - 3, '#ffffff'); p.rect(x0 + 1, y0 + eh - 2, ew - 2, 1, mix(pc, '#6a8aff', 0.45)); }
+    else { p.set(x0 + 1, y0 + 1, '#ffffff'); p.set(x0 + 2, y0 + 1, '#ffffff'); p.set(x0 + ew - 2, y0 + eh - 2, mix(pc, '#6a8aff', 0.5)); }
+    if (kind === 'wide') { p.set(x0 + ew - 2, y0 + 1, '#ffffff'); }
+    if (kind === 'brave') { const by = y0 - 2; for (let i = 0; i < ew; i++) p.set(x0 + i, by + (s < 0 ? (i >= ew - 2 ? 1 : 0) : (i <= 1 ? 1 : 0)), pc); }
   }
-  const my = cy + Math.ceil(eh / 2) + 1;
-  p.rect(cx - 2, my + 1, 4, 1, '#3a1a2a'); p.set(cx - 3, my, '#3a1a2a'); p.set(cx + 2, my, '#3a1a2a'); // a small smile
-  p.rect(cx - 1, my + 2, 2, 1, '#e8708a');
-  if (c.blush) for (const x of [cx - gap - ew - 1, cx + gap + ew - 1]) p.rect(x, my - 1, 2, 1, '#ff9ab0');
+  const my = cy + Math.ceil(eh / 2) + (big ? 1 : 0), mc = c.mouth || '#4a1a2a';
+  // cheeks
+  for (const x of [cx - gap - ew - (big ? 1 : 0), cx + gap + ew - (big ? 2 : 1)]) { p.rect(x, my - 1, big ? 3 : 2, 1, '#ff8fae'); if (big) p.set(x + 1, my - 2, '#ffb8c8'); }
+  if (kind === 'brave') { p.rect(cx - 2, my, 4, 1, mc); p.set(cx - 2, my + 1, '#ffffff'); p.set(cx + 1, my + 1, '#ffffff'); return; }
+  // ω mouth, open a little with a tongue
+  p.set(cx - 3, my, mc); p.set(cx - 2, my + 1, mc); p.set(cx - 1, my, mc); p.set(cx, my, mc); p.set(cx + 1, my + 1, mc); p.set(cx + 2, my, mc);
+  if (big) { p.set(cx - 1, my + 1, '#e8607a'); p.set(cx, my + 1, '#e8607a'); }
 }
-M.gelstack = (c) => { // three jellies piled into a tower
-  const p = P(48, 70);
-  jelly(p, 24, 56, 19, 12, c.c || '#4a9ae8', c);
-  jelly(p, 24, 36, 16, 10.5, c.b || '#ff7a3a', c);
-  jelly(p, 24, 18, 13, 9, c.body || '#5ad84a', c);
-  if (c.crown) { poly(p, [[16, 10], [16, 3], [20, 6], [24, 1], [28, 6], [32, 3], [32, 10]], ramp('#e8c050')); p.ell(24, 7, 1.6, 1.6, '#d84a4a'); }
-  return p.outline();
-};
-M.shellgel = (c) => { // a jelly wearing a spiral shell like a helmet
-  const p = P(48, 48), S = ramp(c.shell || '#a8783a');
-  jelly(p, 24, 34, 19, 12, c.body || '#6ad85a', c);
-  for (const x of [13, 24, 35]) poly(p, [[x - 3, 12], [x, 3], [x + 3, 12]], S);   // three little spikes
-  p.sell(24, 17, 17, 10, S); p.rect(7, 24, 34, 3, S[2]); p.rect(7, 24, 34, 1, S[1]);
-  for (const r of [9, 5.5, 2.2]) for (let y = 7; y < 26; y++) for (let x = 6; x < 42; x++) { const d = Math.hypot((x + 0.5 - 24) / 1.6, y + 0.5 - 16.5); if (Math.abs(d - r) < 0.55 && p.get(x, y)) p.set(x, y, S[2]); }
-  return p.outline();
-};
+// draw a jelly and its face in one go
+function jellyB(p, cx, cy, rx, ry, col, kind, c) { const T = gum(p, cx, cy, rx, ry, col); face(p, cx, Math.round(cy + ry * 0.18), rx >= 14 ? 2 : 1, kind, c); return T; }
+const done = (p, col) => p.outline(tone(col).ol);
+
 M.puddle = (c) => { // a jelly spread flat in a puddle, blowing bubbles
-  const p = P(56, 40), R = ramp(c.body || '#6ad84a');
-  p.sell(28, 33, 26, 6, R); p.rect(6, 37, 44, 1, R[2]);
-  jelly(p, 28, 25, 15, 10, c.body || '#6ad84a', c);
-  for (const [x, y, r] of [[9, 12, 3.2], [47, 9, 4], [33, 4, 2.2], [50, 21, 2]]) { p.ell(x, y, r, r, R[0]); p.ell(x, y, Math.max(0.6, r - 1.2), Math.max(0.6, r - 1.2), shade(c.body || '#6ad84a', 0.65)); p.set(Math.round(x - r * 0.4), Math.round(y - r * 0.4), '#ffffff'); }
-  return p.outline();
+  const col = c.body || '#6ad84a', p = P(60, 42), T = tone(col);
+  gum(p, 30, 36, 28, 6, col);
+  jellyB(p, 30, 27, 16, 12, col, 'normal', c);
+  for (const [x, y, r] of [[9, 13, 3.4], [50, 9, 4.4], [36, 3.5, 2.2], [53, 22, 2]]) { p.ell(x, y, r, r, T.lt); p.ell(x + 0.4, y + 0.4, Math.max(0.6, r - 1.3), Math.max(0.6, r - 1.3), mix(T.core, '#ffffff', 0.4)); p.set(Math.round(x - r * 0.45), Math.round(y - r * 0.45), '#ffffff'); }
+  return done(p, col);
 };
-M.rootling = (c) => { // a turnip spirit: a round root with a sprout, little arms and feet
-  const p = P(44, 54), R = ramp(c.body || '#6a3a5a'), L = ramp(c.leaf || '#5ac84a'), W = ramp(c.root || '#c8a070');
-  for (const s of [1, -1]) {                                   // arms and legs, the same on both sides
-    const X = (x) => s > 0 ? x : 44 - x;
-    limb(p, X(10), 30, X(3), 37, 1.8, 1.3, W); p.ell(X(3), 38, 1.6, 1.4, W[1]);
-    limb(p, X(16), 40, X(14), 49, 2.2, 1.8, W); p.ell(X(13), 50, 3, 1.6, W[1]);
+M.gelstack = (c) => { // three jellies piled into a tower, each with its own mood
+  const p = P(50, 72);
+  jellyB(p, 25, 58, 20, 12.5, c.c || '#4a9ae8', 'normal', c);
+  jellyB(p, 25, 38, 17, 11, c.b || '#ff7a3a', 'wide', c);
+  jellyB(p, 25, 19, 14, 10, c.body || '#5ad84a', 'happy', c);
+  if (c.crown) { poly(p, [[17, 11], [17, 3], [21, 7], [25, 1], [29, 7], [33, 3], [33, 11]], ramp('#f0c850')); for (const x of [17, 25, 33]) p.ell(x, x === 25 ? 1.5 : 3.5, 1.3, 1.3, '#fff0a0'); p.ell(25, 8, 1.6, 1.6, '#e84a6a'); }
+  return done(p, c.c || '#4a9ae8');
+};
+M.shellgel = (c) => { // a jelly carrying a big curled snail shell on its back
+  const col = c.body || '#6ad85a', p = P(56, 50), S = tone(c.shell || '#c8884a');
+  // the shell: a fat spiral, banded, sitting up and back
+  const sx = 34, sy = 18, sr = 14;
+  for (let y = sy - sr; y <= sy + sr; y++) for (let x = sx - sr; x <= sx + sr; x++) {
+    const dx = x + 0.5 - sx, dy = y + 0.5 - sy, d = Math.hypot(dx, dy); if (d > sr) continue;
+    const a = Math.atan2(dy, dx), turn = (d / sr * 2.6 + a / (Math.PI * 2) + 10) % 1, l = (-dx * 0.55 - dy * 0.75) / sr;
+    p.set(x, y, turn < 0.14 ? S.dd : l > 0.35 ? S.lt : l < -0.4 ? S.dk : S.md);
   }
-  p.sell(22, 28, 14, 14, R);
-  p.sell(16, 21, 3, 3.5, ramp(shade(c.body || '#6a3a5a', 0.45))); p.set(15, 19, '#ffffff'); p.set(16, 19, '#ffffff');
-  for (const x of [15, 20, 25]) p.rect(x, 39, 4, 1, R[2]);    // root rings near the bottom
-  limb(p, 22, 15, 22, 8, 1.3, 1.1, L[2]);
-  const leaf = [[22, 9], [16, 3], [9, 4], [15, 9]]; poly(p, leaf, L); poly(p, mirror(leaf, 44), L);
-  limb(p, 21, 8, 12, 5, 0.5, 0.5, L[2]); limb(p, 23, 8, 32, 5, 0.5, 0.5, L[2]);
-  jellyFace(p, 22, 27, 3.2, c);
-  return p.outline();
+  p.ell(sx - 5, sy - 6, 3, 2, S.hi); p.set(sx - 6, sy - 7, '#ffffff');
+  jellyB(p, 24, 36, 20, 12, col, 'normal', c);
+  // two little eye-stalk feelers
+  for (const s of [-1, 1]) { const x = 24 + s * 7; limb(p, x, 26, x + s * 2, 19, 1, 0.8, tone(col).md); p.ell(x + s * 2, 18, 1.6, 1.6, tone(col).lt); }
+  return done(p, col);
 };
-M.gelknight = (c) => { // a little armoured knight riding a big jelly
-  const p = P(60, 70), A = ramp(c.armor || '#a8b0c8'), G = ramp(c.gold || '#e8c050');
-  jelly(p, 30, 54, 24, 14, c.body || '#5ad84a', c);
-  limb(p, 25, 38, 21, 45, 2.4, 2, A); limb(p, 35, 38, 39, 45, 2.4, 2, A);       // legs astride
-  poly(p, [[22, 24], [38, 24], [38, 39], [22, 39]], A); p.rect(22, 33, 16, 2, G[1]); p.rect(29, 33, 2, 2, G[0]); // body, belt
-  p.sell(30, 16, 7.5, 7.5, A); p.rect(23, 15, 14, 2, '#1c1424'); p.rect(29, 17, 2, 3, '#1c1424'); // helmet with a visor
-  chain(p, [[30, 9], [33, 5], [38, 4]], 1.8, 1.2, ramp(c.plume || '#e84a4a'));
-  limb(p, 38, 27, 44, 30, 2, 1.8, A);                                             // sword arm
-  p.rect(44, 4, 4, 24, '#e8eef8'); p.rect(44, 4, 1, 24, '#ffffff'); p.rect(47, 4, 1, 24, '#a8b0c8'); p.rect(45, 2, 2, 2, '#e8eef8');
-  p.rect(40, 27, 12, 2, G[1]); p.rect(45, 29, 2, 5, '#6a4a2a');
-  poly(p, [[8, 22], [20, 22], [20, 34], [14, 40], [8, 34]], G);                  // shield
-  p.rect(13, 25, 2, 10, c.crest || '#d84a4a'); p.rect(10, 28, 8, 2, c.crest || '#d84a4a');
-  return p.outline();
+M.rootling = (c) => { // a turnip spirit: a plump root with a two-leaf sprout, stubby arms and feet
+  const col = c.body || '#8a4a7a', p = P(46, 56), L = tone(c.leaf || '#5ac84a'), W = ramp(c.root || '#d8b080');
+  for (const s of [1, -1]) {
+    const X = (x) => (s > 0 ? x : 46 - x);
+    limb(p, X(9), 32, X(4), 36, 2.2, 1.8, W);                                     // arms
+    limb(p, X(17), 44, X(16), 50, 2.6, 2.4, W); p.ell(X(15.5), 51, 3.2, 1.8, W[1]);  // feet
+  }
+  // body: a turnip, round with a pointed root tip below
+  gum(p, 23, 30, 15, 16, col, { core: false });
+  for (const y of [40, 43]) p.rect(17, y, 12, 1, tone(col).dk);
+  // the sprout: a stem and two big leaves with veins
+  limb(p, 23, 16, 23, 9, 1.4, 1.2, L.dk);
+  const leaf = [[23, 10], [17, 3], [9, 2], [5, 6], [11, 10], [18, 11]];
+  poly(p, leaf, [L.lt, L.md, L.dk]); poly(p, mirror(leaf, 46), [L.lt, L.md, L.dk]);
+  limb(p, 22, 9, 9, 5, 0.5, 0.5, L.dk); limb(p, 24, 9, 37, 5, 0.5, 0.5, L.dk);
+  face(p, 23, 28, 2, c.eye === '#ff3a3a' ? 'brave' : 'happy', c);
+  return done(p, col);
 };
-M.wyrmgel = (c) => { // a jelly that has grown dragon's horns, bat wings and a curling tail
-  const p = P(60, 54), body = c.body || '#f0b02a', Wg = ramp(c.wing || shade(body, -0.22)), H = ramp(c.horn || '#fff0c0');
-  const wing = [[18, 30], [3, 10], [7, 17], [3, 22], [9, 24], [6, 30], [13, 33]];
-  poly(p, wing, Wg); poly(p, mirror(wing, 60), Wg);
-  for (const [a, b] of [[[17, 29], [4, 12]], [[16, 30], [5, 22]], [[16, 31], [7, 30]]]) { limb(p, a[0], a[1], b[0], b[1], 0.6, 0.5, Wg[2]); limb(p, 60 - a[0], a[1], 60 - b[0], b[1], 0.6, 0.5, Wg[2]); }
-  chain(p, [[44, 46], [52, 46], [56, 41], [54, 37]], 2.6, 1.2, ramp(body));
-  jelly(p, 30, 35, 18, 14, body, c);
-  limb(p, 22, 23, 17, 9, 2.4, 0.8, H); limb(p, 38, 23, 43, 9, 2.4, 0.8, H);      // horns
-  p.rect(26, 45, 1, 2, '#ffffff'); p.rect(33, 45, 1, 2, '#ffffff');                // two little fangs
-  return p.outline();
+M.gelknight = (c) => { // a little knight with a cape, sword raised, riding a brave jelly
+  const col = c.body || '#5ad84a', p = P(64, 74), A = tone(c.armor || '#b8c0d8'), G = tone(c.gold || '#f0c850'), K = tone(c.cape || '#d84a5a');
+  // the cape flying out behind
+  poly(p, [[26, 22], [38, 22], [44, 40], [36, 37], [30, 42], [22, 38]], [K.lt, K.md, K.dk]);
+  jellyB(p, 32, 57, 25, 14, col, 'brave', c);
+  // legs astride, body, belt
+  limb(p, 28, 38, 26, 46, 2.6, 2.2, [A.lt, A.md, A.dk]); limb(p, 36, 38, 38, 46, 2.6, 2.2, [A.lt, A.md, A.dk]); p.ell(25.5, 46.5, 2.6, 1.6, A.dk); p.ell(38.5, 46.5, 2.6, 1.6, A.dk);
+  poly(p, [[25, 25], [39, 25], [38, 39], [26, 39]], [A.lt, A.md, A.dk]); p.rect(26, 33, 12, 2, G.md); p.rect(31, 33, 2, 2, G.hi);
+  // a round helmet with a T visor and a plume
+  gum(p, 32, 17, 8, 8.5, c.armor || '#b8c0d8'); p.rect(26, 16, 12, 2, '#1c1424'); p.rect(31, 18, 2, 4, '#1c1424'); p.set(28, 16, '#6a8aff'); p.set(35, 16, '#6a8aff');
+  chain(p, [[32, 9], [36, 4], [42, 3], [45, 6]], 2, 1.2, [K.lt, K.md, K.dk]);
+  // the sword arm raised high, the blade gleaming
+  limb(p, 39, 28, 46, 22, 2.2, 1.8, [A.lt, A.md, A.dk]);
+  limb(p, 48, 20, 58, 2, 1.6, 1.2, ['#ffffff', '#e8eef8', '#a8b0c8']); p.set(57, 3, '#ffffff');
+  limb(p, 44, 18, 51, 23, 1, 1, [G.lt, G.md, G.dk]); limb(p, 46, 21, 48, 24, 1, 1, '#6a4a2a');
+  // the shield on the near arm
+  poly(p, [[10, 23], [23, 23], [23, 35], [16.5, 42], [10, 35]], [G.lt, G.md, G.dk]);
+  poly(p, [[12, 25], [21, 25], [21, 34], [16.5, 39], [12, 34]], [mix(c.crest || '#d84a4a', '#ffffff', 0.25), c.crest || '#d84a4a', shade(c.crest || '#d84a4a', -0.3)]);
+  p.rect(16, 27, 1, 9, G.hi); p.rect(13, 30, 7, 1, G.hi);
+  return done(p, col);
+};
+M.wyrmgel = (c) => { // a jelly grown into a little dragon: swept horns, ribbed wings, a spiked back and a curling tail
+  const body = c.body || '#f0b02a', p = P(64, 56), Wg = tone(c.wing || mix(shade(body, -0.1), '#ff7a4a', 0.25)), H = tone(c.horn || '#fff0c8');
+  const wing = [[21, 32], [9, 8], [6, 15], [1, 16], [5, 22], [1, 26], [8, 28], [6, 34], [15, 35]];
+  poly(p, wing, [Wg.lt, Wg.md, Wg.dk]); poly(p, mirror(wing, 64), [Wg.lt, Wg.md, Wg.dk]);
+  for (const [a, b] of [[[20, 31], [9, 9]], [[19, 32], [2, 17]], [[19, 33], [2, 26]], [[18, 34], [7, 34]]]) { limb(p, a[0], a[1], b[0], b[1], 0.7, 0.5, Wg.dd); limb(p, 64 - a[0], a[1], 64 - b[0], b[1], 0.7, 0.5, Wg.dd); }
+  chain(p, [[46, 48], [55, 48], [60, 43], [58, 38], [54, 39]], 3, 1.3, [tone(body).lt, tone(body).md, tone(body).dk]);
+  poly(p, [[58, 36], [62, 33], [61, 39]], [H.lt, H.md, H.dk]);                       // the tail's spade tip
+  jellyB(p, 32, 38, 19, 15, body, 'brave', c);
+  // horns sweeping back and up
+  chain(p, [[24, 27], [20, 19], [19, 12], [22, 7]], 2.6, 0.8, [H.lt, H.md, H.dk]); chain(p, [[40, 27], [44, 19], [45, 12], [42, 7]], 2.6, 0.8, [H.lt, H.md, H.dk]);
+  return done(p, body);
 };
 for (const [k, f] of Object.entries(M)) registerMonster(k, f);
