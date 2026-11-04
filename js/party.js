@@ -136,7 +136,7 @@ export function gearFx(S, id, statsOnly) {
   for (const [sid, n] of Object.entries(h.pts || {})) { const I = SKILL_INFO[sid]; if (I?.passive && n > 0) fx = mergeFx(fx, I.fxAt(Math.min(SKILL_MAX + 10, n + bonus + (fx.skillTree?.[`${clsOf(id)}_${I.tree}`] || 0)))); }
   if (!statsOnly && S.meal?.n > 0) fx = mergeFx(fx, Object.fromEntries(Object.entries(S.meal.fx).filter(([k]) => !['start', 'limit'].includes(k))));
   // resistances: percent points add up (capped at 75%), less the penalty of the harder difficulties
-  const pen = [0, 30, 60][S.diff || 0], res = fx.res || {};
+  const pen = [0, 30, 60][S.diff || 0] + (S.riftRes || 0), res = fx.res || {}; // a rift of the elemental curse takes 20 more
   fx.resist = { ...(fx.resist || {}) };
   for (const e of ['fire', 'ice', 'thunder', 'water', 'wind', 'earth', 'light', 'dark']) { const v = Math.min(75, (res[e] || 0) - pen); const m = +((1 - v / 100) * (fx.resistAll || 1)).toFixed(2); const cur = fx.resist[e]; if (m !== 1 || cur != null) fx.resist[e] = Math.min(cur ?? 9, m); }
   if (fx.onHitP) fx.onHit = { ...(fx.onHit || {}), poison: Math.min(0.9, (fx.onHit?.poison || 0) + fx.onHitP) };

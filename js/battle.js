@@ -1,4 +1,5 @@
 // Turn-based battles: a timeline, break shields, Full Break -> Extra Phase -> Resonance, summons and limits.
+import { keyReward, keyDrop, keyLine } from './rift.js?v=1';
 import { balanceFor } from './balance.js?v=1';
 import * as THREE from '../lib/three.module.min.js';
 import { Sprite, Particles, skyDome, blobShadow } from './render.js?v=1';
@@ -166,7 +167,7 @@ export class Battle {
     if (M?.lv) for (const k of ['hp', 'atk', 'def', 'mag', 'spr', 'spd']) st[k] = scaleTo(st[k], k, E.lv, lv);
     if (M?.rank === 1) { st.hp = Math.round(st.hp * 2.2); st.atk = Math.round(st.atk * 1.2); st.mag = Math.round(st.mag * 1.2); }
     if (M?.rank === 2) { st.hp = Math.round(st.hp * 5); st.atk = Math.round(st.atk * 1.45); st.mag = Math.round(st.mag * 1.45); st.def = Math.round(st.def * 1.2); st.spd = Math.round(st.spd * 1.15); }
-    if (opts.pw) { const w = opts.pw; st.hp = Math.round(st.hp * w.hp); st.atk = Math.round(st.atk * w.atk); st.mag = Math.round(st.mag * w.atk); st.def = Math.round(st.def * w.def); st.spr = Math.round(st.spr * w.def); } // the Dead King's palace, deeper is stronger
+    if (opts.pw) { const w = opts.pw; st.hp = Math.round(st.hp * w.hp); st.atk = Math.round(st.atk * w.atk); st.mag = Math.round(st.mag * w.atk); st.def = Math.round(st.def * w.def); st.spr = Math.round(st.spr * w.def); if (w.spd) st.spd = Math.round(st.spd * w.spd); } // the Dead King's palace, deeper is stronger
     const extraTraits = [], mods = (M?.mods || []).map(k => MODS[k]).filter(Boolean);
     for (const m of mods) { if (m.atk) { st.atk = Math.round(st.atk * m.atk); st.mag = Math.round(st.mag * m.atk); } if (m.spd) st.spd = Math.round(st.spd * m.spd); if (m.def) st.def = Math.round(st.def * m.def); if (m.traits) extraTraits.push(...m.traits); }
     const nm = M?.rank === 2 ? `${M.name}・${E.name}` : M?.rank === 1 ? `冠軍${E.name}` : E.name;
@@ -175,7 +176,7 @@ export class Battle {
     // nightmare, hell and the palace: some monsters shrug off an element (rarely, blows); break their shield, lower their resistances or pierce them
     const dif = this.S.diff || 0, pal = !!opts.pw, rk = M?.rank || 0;
     if (M && !E.boss && !E.metal && (dif || pal)) {
-      const ch = pal ? (rk ? 0.6 : 0.33) : dif === 2 ? (rk ? 0.5 : 0.25) : rk ? 0.3 : 0;
+      const ch = opts.rift?.a.includes('imm') ? (rk ? 0.9 : 0.7) : pal ? (rk ? 0.6 : 0.33) : dif === 2 ? (rk ? 0.5 : 0.25) : rk ? 0.3 : 0;
       if (Math.random() < ch) {
         const n = rk === 2 && (dif === 2 || pal) && Math.random() < 0.35 ? 2 : 1, pool = ELS.filter(e => !u.weak.includes(e)), pref = pool.filter(e => u.resist.includes(e));
         u.imm = new Set();
@@ -186,6 +187,7 @@ export class Battle {
     if (mods.some(m => m.skill)) u.acts = [...E.acts, ...mods.filter(m => m.skill).map(m => [m.skill, 2.5])];
     for (const m of mods) { if (m.el) u.atkEl = m.el; if (m.onHit) u.onHitSt = m.onHit; if (m.resistAll) u.resistAll = m.resistAll; if (m.aura === 'haste') u.status.haste = 99; if (m.aura === 'regen') u.autoRegen = true; }
     if (M?.rank) { const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 40), new THREE.MeshBasicMaterial({ color: M.rank === 2 ? '#e8b040' : '#5a8aff', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 0); ring.scale.setScalar((spr.w || 1.5) * 0.7); u.rankRing = ring; }
+    if (opts.rift?.a.includes('regen') && !E.boss && !opts.boss) u.autoRegen = true; // a rift of regeneration (never its guardian)
     if (u.traits.has('reflect')) u.status.reflect = 99;
     if (u.traits.has('stealth')) u.status.hidden = 99;
     if (u.traits.has('phase')) u.phase = Math.random() < 0.5 ? 'phys' : 'mag';
@@ -1399,7 +1401,8 @@ export class Battle {
     if (P.includes('p_exp')) exp = Math.round(exp * 1.5);
     if (P.includes('p_gil')) gil = Math.round(gil * 1.5);
     const LQ = this.opts.lootQ || 1, rich = 1 + (LQ - 1) * 0.3; // the palace pays better the deeper you go
-    exp = Math.round(exp * (1 + best('exp')) * rich); gil = Math.round(gil * (1 + best('gil')) * rich);
+    const RW = this.opts.rift ? keyReward(this.opts.rift) : { iiq: 0, mf: 0, exp: 0 }; // a rift key's modifiers pay in items, magic find and experience
+    exp = Math.round(exp * (1 + best('exp') + RW.exp / 100) * rich); gil = Math.round(gil * (1 + best('gil')) * rich);
     const dropMul = (1 + best('drop') + (this.dropBonus || 0)) * rich;
     const drops = [];
     this.S.kills = this.S.kills || {}; this.S.dropSeen = this.S.dropSeen || {};
@@ -1407,7 +1410,7 @@ export class Battle {
     // farming: a battle won in the first round or two pays better, and so does a long streak of wins (it cools when you run, and ends when you fall or set out again)
     const fast = this.round <= 1 ? 2 : this.round <= 2 ? 1 : 0, H = this.S.heat = Math.min(20, (this.S.heat || 0) + 1);
     exp = Math.round(exp * (1 + H * 0.02 + [0, 0.1, 0.2][fast]));
-    const mf = Math.max(0, ...this.party.map(u => u.fx?.mf || 0)) + this.party.reduce((s, u) => s + (u.fx?.mf || 0), 0) * 0.25 + H * 4 + [0, 25, 60][fast];
+    const mf = Math.max(0, ...this.party.map(u => u.fx?.mf || 0)) + this.party.reduce((s, u) => s + (u.fx?.mf || 0), 0) * 0.25 + H * 4 + [0, 25, 60][fast] + RW.mf;
     const rf = (1 + Math.max(0, ...this.party.map(u => u.fx?.runeF || 0)) + H * 0.04) * rich, FQ = [1, 1.1, 1.25][fast];
     const loot = [], runes = [];
     for (const u of killed) {
@@ -1425,14 +1428,20 @@ export class Battle {
       if (Math.random() < 0.08 * tq) { addItem(this.S, 'i_restat', 1); drops.push('i_restat'); }
       if (Math.random() < 0.03 * tq) { addItem(this.S, 'i_reclass', 1); drops.push('i_reclass'); }
     }
+    for (let k = loot.length * RW.iiq / 100; k > 0; k--) if (Math.random() < Math.min(1, k)) { const u = killed[Math.floor(Math.random() * killed.length)]; loot.push(rollItem(this.S, u.lootLv || u.lv, { mf, quality: LQ * FQ, minRarity: 1 })); }
     for (const uid of loot) addItem(this.S, uid, 1);
+    // rift keys: from the palace's monsters and from rifts
+    const keys = [], fl = this.G.field?.def?.floor || 0;
+    if (fl || this.opts.rift) for (const u of killed) { const k = keyDrop(this.S, { floor: fl, rift: this.opts.rift, rank: u.rank, boss: u.E.boss || this.opts.boss }); if (k) keys.push(k); }
+    if (keys.length) (this.S.keys ||= []).push(...keys);
     this.S.gil += gil;
     const { gainExp } = await import('./party.js?v=1');
     const ups = gainExp(this.S, exp);
     if (this.S.meal?.n > 0) { this.S.meal.n--; if (!this.S.meal.n) this.S.meal = null; }
     this.S.battles++;
-    this.lastSpoils = { exp, gil, drops, loot, runes };
+    this.lastSpoils = { exp, gil, drops, loot, runes, keys };
     const bonus = [fast ? `速殺！${this.round} 回合結束：尋寶 +${[0, 25, 60][fast]}%、經驗 +${[0, 10, 20][fast]}%` : '', `連殺熱度 ${H}：尋寶 +${H * 4}%、經驗 +${H * 2}%、符文 +${H * 4}%`].filter(Boolean);
+    if (keys.length) bonus.push(...keys.map(k => `<span style="color:#c08aff">🗝 秘境鑰匙　第 ${k.t} 階（${keyLine(k)}）</span>`));
     await this.ui.results({ exp, gil, drops, ups, bond: [], loot, runes, bonus });
   }
 }

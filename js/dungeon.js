@@ -97,6 +97,8 @@ export const LOOK = {
   '4_2': { theme: 'castle', bg: 'castle', bright: 2.8, deco: [['banner', 0.005, 1], ['brazier', 0.004, 1], ['skulls', 0.005], ['spikes', 0.003, 1], ['pillar', 0.003, 1]], box: ['iron'], minor: ['urn', 'bonepile'] },
   '4_3': { theme: 'hell', bg: 'hell', bright: 2.6, deco: [['brazier', 0.004, 1], ['skulls', 0.008], ['spikes', 0.006, 1], ['tentacle', 0.004, 1, { color: '#8a2a2a' }]], box: ['iron'], minor: ['bonepile', 'cocoon'] },
 };
+// every level's look with the ground and monsters that go with it (the rifts borrow them)
+export const LOOK_KEYS = Object.keys(LOOK).map(k => { const [a, l] = k.split('_').map(Number), L = ACTS[a].levels[l]; return { look: LOOK[k], theme: L[1], hab: L[2] }; });
 const boxObj = (key, extra) => { const B = BOX[key] || BOX.chest; return { k: 'chest', name: B.n, style: B.style, color: B.color, mat: B.mat, trim: B.trim, ...extra }; };
 
 // ---------------------------------------------------------------- a dungeon level
@@ -131,7 +133,7 @@ export function genLevel(S, act, lvl, seed = Math.floor(Math.random() * 1e9), X 
   if (X) {
     const B = X.back; objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: B.to, tx: B.tx, tz: B.tz, dir: B.dir, label: B.label }, { k: 'gate', x: sx - 1, z: sz + 2, w: 3, color: '#6ab8ff', label: '▲ ' + B.label, back: true });
     if (X.next) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: X.next.to, tx: -1, tz: -1, dir: 'up', label: X.next.label, ...(X.boss ? { cond: 'pboss', lockMsg: '守護者還擋在門前。', push: 0.8 } : {}) }, { k: 'gate', x: ex - 1, z: ez - 2, w: 3, color: X.boss ? '#ff4a4a' : '#ffb04a', label: '▼ ' + X.next.label });
-    if (X.boss) objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: 'pboss', floor: X.floor });
+    if (X.boss) objs.push({ k: 'event', x: ex - 3, z: ez + 1, w: 7, d: 1, id: X.bossEv || 'pboss', floor: X.floor });
     if (!X.next) objs.push({ k: 'bigcrystal', x: ex, z: ez - 1, color: '#ff3a3a' });
   } else objs.push({ k: 'warp', x: sx - 1, z: sz + 2, w: 3, d: 1, to: lvl === 0 ? 'town' : mapId(act, lvl - 1), tx: lvl === 0 ? 15 : -2, tz: lvl === 0 ? 22 : -2, dir: lvl === 0 ? 'up' : 'down', label: backN.slice(2) }, { k: 'gate', x: sx - 1, z: sz + 2, w: 3, color: '#6ab8ff', label: backN, back: true });
   if (!X && !last) objs.push({ k: 'warp', x: ex - 1, z: ez - 2, w: 3, d: 1, to: mapId(act, lvl + 1), tx: -1, tz: -1, dir: 'up', label: nextN.slice(2) }, { k: 'gate', x: ex - 1, z: ez - 2, w: 3, color: '#ffb04a', label: nextN });
@@ -241,12 +243,13 @@ export function rollTroop(S, def, r = Math.random) {
   const lv = def.alv, pool = poolFor(def.hab, Math.min(lv, 60));
   const ps = S.party.length, n = (ps >= 3 ? 2 : 1) + Math.floor(r() * (ps >= 2 ? 3 : 2)) + (r() < (ps >= 2 ? 0.25 : 0.08) ? 1 : 0); // bigger parties meet bigger packs
   const troop = [], mods = [];
-  const kind = r() < 0.05 ? 'unique' : r() < 0.12 ? 'champion' : 'normal';
+  const R = def.rift, el = R?.a.includes('elite') ? 3 : 1;
+  const kind = r() < 0.05 * el ? 'unique' : r() < 0.12 * el ? 'champion' : 'normal';
   const mainId = pool[Math.floor(r() * pool.length)];
   const modKeys = Object.keys(MODS).filter(k => !MODS[k].skill), powKeys = Object.keys(MODS).filter(k => MODS[k].skill);
   const pickFrom = (keys, k, out = []) => { while (out.length < k) { const m = keys[Math.floor(r() * keys.length)]; if (!out.includes(m)) out.push(m); } return out; };
   const pickMods = (k, pw) => [...pickFrom(modKeys, k), ...pickFrom(powKeys, pw)];
-  for (let i = 0; i < Math.min(4, n); i++) {
+  for (let i = 0; i < Math.min(4, n + (R?.a.includes('dense') && r() < 0.6 ? 1 : 0)); i++) {
     const id = kind === 'normal' ? pool[Math.floor(r() * pool.length)] : mainId;
     troop.push(id);
     if (kind === 'champion') mods.push({ rank: 1, mods: i === 0 ? pickMods(1, r() < 0.35 ? 1 : 0) : [], lv });
@@ -254,6 +257,8 @@ export function rollTroop(S, def, r = Math.random) {
     else mods.push({ rank: 0, mods: [], lv: lv + Math.round((r() - 0.5) * 2) });
   }
   if (kind === 'champion') { const m = mods[0].mods; for (const x of mods) x.mods = m; } // a champion pack shares its modifier
+  // a rift's modifiers: every monster carries the key's monster modifier, or a special move
+  if (R) for (const x of mods) { x.mods = [...x.mods]; if (R.a.includes('mod') && !x.mods.includes(R.mk)) x.mods.push(R.mk); if (R.a.includes('power') && !x.mods.some(m => MODS[m].skill)) x.mods.push(pickFrom(powKeys, 1)[0]); }
   return { troop, mods, kind };
 }
 // stats of a monster moved to another level (curves measured from the bestiary)

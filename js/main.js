@@ -11,6 +11,7 @@ import { makeStory, QUESTS } from './town.js?v=1';
 import './menus.js?v=1';
 import { autoBuild } from './menus.js?v=1';
 import { restoreLoot, rollItem, dropLoot } from './loot.js?v=1';
+import { genRift, riftId, RIFT_AFX } from './rift.js?v=1';
 import { genLevel, parseId, rollTroop, ACTS, WP_LEVELS, mapId, DIFFS, genPalace, parsePalace, palaceId } from './dungeon.js?v=1';
 import { CLASSES } from './classes.js?v=1';
 import { MAPS } from './maps.js?v=1';
@@ -225,6 +226,7 @@ class Game {
         this.audio.sfx('save'); this.unlockHere(); this.save();
         const to = await this.ui.waypointMenu();
         if (to === 'portal') { const P = this.S.portal; this.busy = false; await this.warp(P.map, P.x, P.z, 'down', { portal: true }); }
+        else if (to === 'rift') { const k = await this.ui.riftMenu(); if (k) { this.S.riftCur = k; this.busy = false; await this.travel(riftId); } }
         else if (to === 'palace') { const fl = await this.ui.palaceMenu(); if (fl) { this.busy = false; await this.travel(palaceId(fl)); } }
         else if (to && to !== this.field.mapId) { this.busy = false; await this.travel(to); }
       } else if (it.kind === 'tablet') {
@@ -240,8 +242,9 @@ class Game {
 
   // ---------------------------------------------------------------- moving between places
   // dungeon levels are laid out when you enter them; going out from the camp starts a fresh expedition
-  clearDungeons() { this.S.heat = 0; const dun = (k) => parseId(k) || parsePalace(k); for (const k of Object.keys(MAPS)) if (dun(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^(d\d_\d|p\d+)_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (dun(k)) delete this.S.explored[k]; }
+  clearDungeons() { this.S.heat = 0; const dun = (k) => parseId(k) || parsePalace(k) || k === riftId; for (const k of Object.keys(MAPS)) if (dun(k)) delete MAPS[k]; this.S.seeds = {}; this.S.chests = (this.S.chests || []).filter(id => !/^(d\d_\d|p\d+|r1)_/.test(id)); for (const k of Object.keys(this.S.explored || {})) if (dun(k)) delete this.S.explored[k]; }
   ensureMap(to) {
+    if (to === riftId) { if (!MAPS[to] && this.S.riftCur) { const def = genRift(this.S, this.S.riftCur, this.S.seeds?.[to]); (this.S.seeds ||= {})[to] = def.seed; } return; }
     const pf = parsePalace(to); if (pf) { if (!MAPS[to]) { const def = genPalace(this.S, pf, this.S.seeds?.[to]); this.S.seeds = this.S.seeds || {}; this.S.seeds[to] = def.seed; } return; }
     const p = parseId(to); if (!p) return;
     if (!MAPS[to]) { const seed = this.S.seeds?.[to]; const def = genLevel(this.S, p.act, p.lvl, seed); this.S.seeds = this.S.seeds || {}; this.S.seeds[to] = def.seed; }
@@ -252,7 +255,8 @@ class Game {
     if (o.cond && !this.cond(o.cond)) return;
     this.busy = true;
     if (!o.quiet) { if (o.door) this.audio.sfx('door'); await this.ui.fade(1, 300); }
-    if (this.field.def?.town && (parseId(to) || parsePalace(to)) && !o.portal) this.clearDungeons();
+    if (this.field.def?.town && (parseId(to) || parsePalace(to) || to === riftId) && !o.portal) this.clearDungeons();
+    this.S.riftRes = to === riftId && this.S.riftCur?.a.includes('res') ? RIFT_AFX.res.resDown : 0;
     if (o.portal) this.S.portal = null;
     // the palace: remember how deep you have been, and what you carried when you went down (see palaceDeath)
     const pf = parsePalace(to);
@@ -310,7 +314,7 @@ class Game {
     if (this.busy || this.mode !== 'field') return;
     const T = rollTroop(this.S, this.field.def);
     if (T.kind === 'unique') this.ui.toast(`<span style="color:#e8b040">獨特怪物出現了！</span>`);
-    const res = await this.fight({ troop: T.troop, mods: T.mods, bg: this.bgFor(), preemptive: Math.random() < 0.1, random: true, pw: this.field.def.pw, lootQ: this.field.def.lootQ });
+    const res = await this.fight({ troop: T.troop, mods: T.mods, bg: this.bgFor(), preemptive: Math.random() < 0.1, random: true, pw: this.field.def.pw, lootQ: this.field.def.lootQ, rift: this.field.def.rift });
     if (this.grind) await this.grind.afterBattle(res, this.battle.lastSpoils);
     return res;
   }

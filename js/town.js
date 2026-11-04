@@ -1,5 +1,6 @@
 // The people of the camp and the act bosses. Same shape as Crystal Echoes' story module (TALK, EV, board...),
 // but there is no script to follow: the goal is always the next act's boss, and better loot.
+import { riftBoss, rollKey, keyLine } from './rift.js?v=1';
 import { HEROES, ENEMIES } from './data.js?v=1';
 import { healAll, addItem } from './party.js?v=1';
 import { ACTS, DIFFS, areaLevel, mapId, palaceBoss, PALACE_N } from './dungeon.js?v=1';
@@ -28,6 +29,21 @@ export function makeStory(G) {
     },
   };
   const EV = {
+    // the guardian of a rift: beat it for keys of the next tier
+    async rboss(o) {
+      const s = S(), def = G.field.def, k = def.rift; if (def.bossDone || !k) return;
+      const id = riftBoss(k.t), E = ENEMIES[id];
+      await say('', `秘境的守護者「${E.name}」現身了！`, null);
+      const res = await G.fight({ troop: [id], mods: [{ rank: 0, lv: 99, mods: [] }], bg: G.bgFor(), noFlee: true, boss: true, music: 'boss', pw: def.pw, lootQ: def.lootQ, rift: k });
+      if (res !== 'win') return;
+      def.bossDone = true; G.updateObjective();
+      s.riftBest = Math.max(s.riftBest || 0, k.t); s.riftWon = (s.riftWon || 0) + 1;
+      const more = [rollKey(k.t + 1), ...(Math.random() < 0.5 ? [rollKey(k.t)] : [])]; (s.keys ||= []).push(...more);
+      await say('', `秘境第 ${k.t} 階完成了！
+守護者留下了：
+${more.map(x => `🗝 第 ${x.t} 階鑰匙（${keyLine(x)}）`).join('\n')}`, null);
+      if (await G.ui.yesno('要回營地嗎？')) await G.warp('town', 15, 18, 'down');
+    },
     // a guardian of the Dead King's palace, on every tenth floor
     async pboss(o) {
       const s = S(), def = G.field.def, f = def.floor; if (def.bossDone || !f) return;
@@ -62,7 +78,7 @@ export function makeStory(G) {
   return {
     TALK, EV, SIGNS: {}, SPOT_EVENTS: {},
     bubble(def) { return def.id === 'elder' && nextBoss() >= 0 ? '!' : null; },
-    objectiveText() { const d = G.field?.def; if (d?.floor) return `死王宮殿 第${d.floor}層：${d.floor % 10 === 0 && !d.bossDone ? (d.floor >= PALACE_N ? '打倒死王' : '打倒守護者，打開往下的門') : '找到往下的門（入口可以返回地面）'}`;
+    objectiveText() { const d = G.field?.def; if (d?.rift) return `秘境 第${d.rift.t}階：${d.bossDone ? '完成了！從入口回營地' : '走到盡頭，打倒守護者'}`; if (d?.floor) return `死王宮殿 第${d.floor}層：${d.floor % 10 === 0 && !d.bossDone ? (d.floor >= PALACE_N ? '打倒死王' : '打倒守護者，打開往下的門') : '找到往下的門（入口可以返回地面）'}`;
       const a = nextBoss(); return a < 0 ? '' : `目標：打倒 ${ACTS[a].n.split('　')[0]}首領「${ACTS[a].bossN}」`; },
     async board(id) { if (id === 'stash') await G.ui.stashMenu(); },
   };

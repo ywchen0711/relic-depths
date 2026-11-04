@@ -1,7 +1,8 @@
 // The new windows: picking a class, skill trees, stat points, the bag, the stash, the shop, gambling, hiring and
 // the waypoints. They are added to the UI class from ui.js so they share its chooser and tooltips.
+import { rollKey, keyPower, keyLootQ, keyLine, afxText, rewardText, riftBoss, RIFT_AFX, RIFT_MAX } from './rift.js?v=1';
 import { UI, fullSprite, portrait } from './ui.js?v=1';
-import { HEROES, SKILLS, GEAR, ITEMS, ELEM, clsOf } from './data.js?v=1';
+import { HEROES, SKILLS, GEAR, ITEMS, ELEM, clsOf, ENEMIES } from './data.js?v=1';
 import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx, hireHero, dismissHero, isLead, MAX_HEROES, inOutfit } from './party.js?v=1';
 import { CLASSES, CLASS_ORDER, TREES, SKILL_INFO, SKILL_MAX, TREE_REQ } from './classes.js?v=1';
 import { RARITY, rollItem, gambleItem, shopStock, sellPrice, dropLoot } from './loot.js?v=1';
@@ -378,10 +379,42 @@ P.palaceMenu = async function () {
   const i = await this.choose(starts.map(f => ({ label: `第 ${f} 層`, sub: f === 1 ? '從頭開始' : `第 ${f - 1} 層的守護者之後` })), { title: '死王宮殿　從哪一層開始？', cls: 'small' });
   return i < 0 ? null : starts[i];
 };
+// rifts: pick a key to open, combine three of a tier into one of the next, reroll a key's modifiers, or buy a first one
+P.riftMenu = async function () {
+  const S = this.S; S.keys ||= [];
+  if (!S.riftGift) { S.riftGift = 1; S.keys.push(rollKey(1), rollKey(1), rollKey(1)); await this.info('<p>死王宮殿的深處，空間開始碎裂……</p><p>在宮殿裡打倒怪物（越強越深越容易）會掉出<b style="color:#c08aff">秘境鑰匙</b>。每把鑰匙開啟一個秘境：一層地城，盡頭有守護者。</p><p>鑰匙有<b>階級</b>（第 1 階約等於宮殿第 10 層，第 10 階約等於第 100 層，之後還會更強）和 1～4 條<b>詞綴</b>：讓怪物更強，也讓寶物更多、更好。打倒守護者會得到更高一階的鑰匙。</p><p>先送你三把第 1 階的鑰匙。</p>', '秘境'); }
+  const BUY = 30000, rer = (k) => 6000 * k.t;
+  const power = (k) => { const w = keyPower(k); return `怪物 HP ×${w.hp.toFixed(1)}　攻擊 ×${w.atk.toFixed(2)}　防禦 ×${w.def.toFixed(2)}${w.spd > 1 ? `　速度 ×${w.spd.toFixed(1)}` : ''}`; };
+  const keyHTML = (k) => `<div class="gi"><h4 style="color:#c08aff">🗝 秘境鑰匙　第 ${k.t} 階</h4>${k.a.map(a => `<div><b>${RIFT_AFX[a].n}</b>　${afxText(k, a)}</div>`).join('')}<div style="color:#ffe04a;margin-top:6px">${rewardText(k) || '沒有額外獎勵'}</div><div class="dim" style="margin-top:6px">${power(k)}</div><div class="dim">寶物品質 ×${keyLootQ(k).toFixed(2)}　守護者：${ENEMIES[riftBoss(k.t)]?.name || ''}</div></div>`;
+  let st = 0;
+  for (;;) {
+    const keys = S.keys.sort((a, b) => b.t - a.t || b.a.length - a.a.length);
+    const tiers = [...new Set(keys.map(k => k.t))], comb = tiers.filter(t => t < RIFT_MAX && keys.filter(k => k.t === t).length >= 3);
+    const rows = [{ label: '合成鑰匙', sub: comb.length ? `可合成：${comb.map(t => '第' + t + '階').join('、')}` : '3 把同階 → 高一階' }, { label: '買一把第 1 階鑰匙', sub: `${BUY} G` },
+      ...keys.map(k => ({ label: `<span style="color:#c08aff">🗝 第 ${k.t} 階</span>`, sub: keyLine(k) }))];
+    const i = await this.choose(rows, { title: `秘境　<span class="gil">${S.gil} G</span>`, start: st || (keys.length ? 2 : 0), info: (j) => j === 0 ? '<p>三把同一階的鑰匙合成一把高一階的鑰匙（詞綴重新骰）。</p>' : j === 1 ? '<p>鑰匙用完了的話，可以在這裡買一把第 1 階的鑰匙。</p>' : keyHTML(keys[j - 2]) });
+    if (i < 0) return null;
+    st = i;
+    if (i === 0) {
+      if (!comb.length) { this.toast('沒有三把同階的鑰匙'); continue; }
+      const c = comb.length === 1 ? 0 : await this.choose(comb.map(t => ({ label: `第 ${t} 階 ×3 → 第 ${t + 1} 階`, sub: `有 ${keys.filter(k => k.t === t).length} 把` })), { title: '合成哪一階？', cls: 'small' });
+      if (c < 0) continue;
+      const t = comb[c]; let n = 0; S.keys = S.keys.filter(k => k.t !== t || ++n > 3); const nk = rollKey(t + 1); S.keys.push(nk); this.G.audio.sfx('item'); this.toast(`合成了第 ${nk.t} 階鑰匙（${keyLine(nk)}）`); continue;
+    }
+    if (i === 1) { if (S.gil < BUY) { this.toast('金幣不夠'); continue; } S.gil -= BUY; S.keys.push(rollKey(1)); this.G.audio.sfx('item'); this.hud(); continue; }
+    const k = keys[i - 2];
+    const a = await this.choose([{ label: '開啟秘境', sub: '用掉這把鑰匙' }, { label: '重骰詞綴', sub: `${rer(k)} G` }, { label: '丟掉這把鑰匙', sub: '' }], { title: `第 ${k.t} 階鑰匙`, info: () => keyHTML(k) });
+    if (a === 0) { if (!await this.yesno(`開啟第 ${k.t} 階秘境？
+${keyLine(k)}
+鑰匙會用掉。`)) continue; S.keys = S.keys.filter(x => x !== k); return k; }
+    if (a === 1) { if (S.gil < rer(k)) { this.toast('金幣不夠'); continue; } S.gil -= rer(k); const nk = rollKey(k.t); k.a = nk.a; k.mk = nk.mk; this.G.audio.sfx('item'); this.hud(); this.toast(`新的詞綴：${keyLine(k)}`); }
+    if (a === 2 && await this.yesno('丟掉這把鑰匙？')) { S.keys = S.keys.filter(x => x !== k); st = 2; }
+  }
+};
 P.waypointMenu = async function () {
   const S = this.S, d = S.diff || 0, rows = [{ label: '暮光營地', sub: '', to: 'town' }];
   if (S.portal && this.G.field.def.town && MAPS[S.portal.map]) rows.unshift({ label: '<span style="color:#8ab8ff">回到傳送門</span>', sub: MAPS[S.portal.map].name.split('　')[0], to: 'portal' });
-  if (S.palace?.open && this.G.field.def.town) rows.push({ label: '<span style="color:#ff6a6a">死王宮殿</span>', sub: `最深 第${S.palace.best || 0}層`, to: 'palace' });
+  if (S.palace?.open && this.G.field.def.town) rows.push({ label: '<span style="color:#ff6a6a">死王宮殿</span>', sub: `最深 第${S.palace.best || 0}層`, to: 'palace' }, { label: '<span style="color:#c08aff">秘境</span>', sub: `鑰匙 ${(S.keys || []).length} 把${S.riftBest ? `　最高 第${S.riftBest}階` : ''}`, to: 'rift' });
   ACTS.forEach((A, a) => WP_LEVELS.forEach(l => { if (S.wp[`d${d}a${a}l${l}`]) rows.push({ label: `${A.n.split('　')[1]}・${A.levels[l][0]}`, sub: `第${a + 1}幕`, to: mapId(a, l) }); }));
   const i = await this.choose(rows, { title: `傳送點　<span style="color:${DIFFS[d].c}">${DIFFS[d].n}</span>`, cls: 'small' });
   return i < 0 ? null : rows[i].to;
