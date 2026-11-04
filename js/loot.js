@@ -15,6 +15,7 @@ ITEMS.i_tp = { name: '回城卷軸', price: 60, use: { townPortal: true }, field
 import { WTYPES, mergeFx, FAM_N, STATUS_N } from './content.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
 import { U2, SETS2, powers } from './loot2.js?v=1';
+import { aspectFx, rollAspect } from './aspects.js?v=1';
 import { RUNEWORDS, RUNES, PROC_IDS, PROC_HIT, PROC_STRUCK, maxSockets, matchRuneword, runeFx } from './runes.js?v=1';
 import { SKILLS } from './data.js?v=1';
 
@@ -303,7 +304,7 @@ export function rollItem(S, ilvl, o = {}, r = Math.random) {
     if (o.minRarity) rar = Math.max(rar, o.minRarity);
   }
   const pf = o.perfect ?? r() < 0.004 * (o.quality || 1); // a perfect piece: every number at the top of its range
-  if (rar === 3) { const all = Object.values(UNIQUES).filter(u => u.lv <= ilvl + 4), near = all.filter(u => u.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const u = pick(pool, r); return register(S, { b: baseFor(u.base, u.tier, Math.max(ilvl, ilvlOfTier(u.tier)), r), r: 3, il: ilvl, u: u.id, ...(pf ? { pf: 1 } : {}) }); } rar = 2; }
+  if (rar === 3) { const all = Object.values(UNIQUES).filter(u => u.lv <= ilvl + 4), near = all.filter(u => u.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const u = pick(pool, r); const b = baseFor(u.base, u.tier, Math.max(ilvl, ilvlOfTier(u.tier)), r); return register(S, { b, r: 3, il: ilvl, u: u.id, ...(pf ? { pf: 1 } : {}), ...(ilvl >= 40 && r() < 0.3 ? { asp: rollAspect(GEAR[b], r, pf) } : {}) }); } rar = 2; } // from item level 40 three uniques in ten carry a legendary power
   if (rar === 4) { const all = Object.values(SET_ITEMS).filter(p => p.lv <= ilvl + 4), near = all.filter(p => p.lv >= ilvl - 30), pool = near.length ? near : all; if (pool.length) { const p = pick(pool, r); return register(S, { b: baseFor(p.base, Math.min(9, Math.floor(p.lv / 9)), Math.max(ilvl, p.lv), r), r: 4, il: ilvl, s: p.id, ...(pf ? { pf: 1 } : {}) }); } rar = 2; }
   // a base piece the item level allows (jewellery only comes magic or better)
   const maxT = Math.max(0, Math.min(9, Math.floor((ilvl - 1) / 8))), tt = Math.max(0, maxT - (r() < 0.65 ? 0 : 1)); // mostly the best base the level allows
@@ -316,6 +317,7 @@ export function rollItem(S, ilvl, o = {}, r = Math.random) {
   if (rar === 2) { const n = rint(ilvl >= 70 ? 4 : 3, ilvl >= 30 ? 6 : 5, r); let pre = 0, suf = 0; for (let i = 0; i < n; i++) { const want = pre >= 3 ? false : suf >= 3 ? true : r() < 0.5; const x = rollAffix(cat, ilvl, want, taken, r, 2, pf, b); if (x) { a.push(x); if (want) pre++; else suf++; } } }
   const spec = { b, r: rar, il: ilvl, a, ...(pf ? { pf: 1 } : {}) };
   if (rar === 2) spec.n = rareName(r);
+  if (rar === 2 && o.aspCh && r() < o.aspCh) spec.asp = rollAspect(GEAR[b], r, pf); // rifts: now and then a rare with a legendary power
   if (rar === 0 && r() < 0.15) spec.q = rint(5, 15, r); // superior
   if (rar === 0 && r() < 0.3) spec.so = rint(1, maxSockets(GEAR[b], ilvl), r); // sockets, for runes
   return register(S, spec);
@@ -337,6 +339,8 @@ export function dropLoot(S, uid) { delete S.loot?.[uid]; }
 // the level a piece is made at, and awakening a god piece to level L (its rolls stay at the top)
 export const lootLevel = (spec) => Math.max(spec.aw || 0, spec.il || 1, UNIQUES[spec.u]?.lv || 0, SET_ITEMS[spec.s]?.lv || 0, RUNEWORDS[spec.rw]?.lv || 0);
 // sockets and runes, done at the smith; runes stay in for good, and the right ones in order make a runeword
+// a legendary power set into a piece (or taken out of it, with null)
+export function setAspect(S, uid, asp) { const spec = S.loot?.[uid]; if (!spec) return false; if (asp) spec.asp = [...asp]; else delete spec.asp; GEAR[uid] = build(spec); forgetGear(uid); return true; }
 export function socketItem(S, uid, n) { const spec = S.loot?.[uid]; if (!spec) return false; spec.so = n; GEAR[uid] = build(spec); forgetGear(uid); return true; }
 export function insertRune(S, uid, i) {
   const spec = S.loot?.[uid]; if (!spec) return null;
@@ -424,6 +428,7 @@ export function build(spec) {
   else if (!RW) { g.name = (spec.q ? '精良的' : '') + pre + B.name + suf + (spec.so ? `〔${spec.so}孔〕` : ''); g.lvReq = spec.r === 1 ? Math.max(1, Math.floor(spec.il * 0.6)) : Math.max(1, B.tier * 6); }
   if (spec.rn?.length) g.lvReq = Math.max(g.lvReq || 1, ...spec.rn.map(i => RUNES[i].lv));
   g.lvReq = Math.min(90, Math.max(g.lvReq || 1, B.tier * 6 + (B.tier >= 8 ? (B.tier - 7) * 6 : 0), aw ? aw - 8 : 0));
+  if (spec.asp) { g.fx = mergeFx(g.fx || {}, aspectFx(spec.asp)); g.aspect = spec.asp; g.name += ' ✦'; }
   g.color = undefined; g.rarColor = RW ? '#e0c080' : RARITY[spec.r].c;
   // how good the rolls are, 0..1; every one at the top makes a perfect piece (only magic or better counts)
   g.qual = rolls.length ? rolls.reduce((s, x) => s + x[4] / x[5], 0) / rolls.length : null;
@@ -431,7 +436,7 @@ export function build(spec) {
   g.maxed = rolls.length > 0 && rolls.every(x => x[4] === x[5]);
   g.godly = (spec.r >= 1 || !!RW) && g.maxed && (spec.pf || rolls.reduce((p, x) => p * (x[5] + 1), 1) >= 100);
   if (g.godly) g.name = '★' + g.name;
-  g.price = Math.round(((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10)) * (g.qual == null ? 1 : 0.8 + g.qual * 0.4) * (g.godly ? 3 : 1) * (aw ? 1.5 : 1) * (RW ? 4 : 1)) + (spec.rn || []).reduce((s, i) => s + ITEMS[RUNES[i].id].price, 0);
+  g.price = Math.round(((B.price || 100) * [1, 1.8, 3.5, 8, 6][spec.r] + (spec.a || []).length * 80 * (1 + spec.il / 10)) * (g.qual == null ? 1 : 0.8 + g.qual * 0.4) * (g.godly ? 3 : 1) * (aw ? 1.5 : 1) * (RW ? 4 : 1) * (spec.asp ? 1.6 : 1)) + (spec.rn || []).reduce((s, i) => s + ITEMS[RUNES[i].id].price, 0);
   return g;
 }
 

@@ -122,6 +122,7 @@ export class Battle {
       if (u.key === 'aegisheart' && shields.length) u.block += 0.15;
       u.block += fx.blockUp || 0;
       if (fx.first >= 1 || (fx.first && Math.random() < fx.first)) u.firstStrike = true;
+      if (fx.asp_swift) u.status.haste = Math.min(8, fx.asp_swift);
       u.alive = u.hp > 0;
       this.addSprite(u, slots[i][0], slots[i][1]); spr.popDelay = 0.25 + i * 0.09;
       if (u.on.includes('p_autoprotect')) this.buff(u, { def: 2 }, true);
@@ -213,7 +214,7 @@ export class Battle {
   async summonMinion(u, S) {
     const treeIdx = S.treeIdx ?? CLASSES[u.hero].trees.findIndex(t => t[0] === 'summon');
     const M = MINIONS[`${u.hero}_${treeIdx}`]; if (!M) return;
-    const T = M[S.minion], lv = S.lvSkill || 1, up = 1 + (u.fx?.minionUp || 0), extra = u.fx?.minionCap ? 1 : 0;
+    const T = M[S.minion], lv = S.lvSkill || 1, up = 1 + (u.fx?.minionUp || 0) + (u.fx?.asp_legion || 0) / 100, extra = u.fx?.minionCap ? 1 : 0;
     const cap = (T.big ? 1 : S.minion === 'A' ? Math.min(4, 1 + Math.floor(lv / 5)) : Math.min(3, 1 + Math.floor(lv / 8))) + extra;
     const k = 1 + 0.08 * (lv - 1), ka = 1.15 * (1 + 0.09 * (lv - 1)); // they grow with the skill about as fast as a spell does
     const st = { hp: Math.round(u.st.hp * T.hp * k * up), mp: 0, atk: Math.round(Math.max(u.st.mag, u.st.atk) * T.atk * ka * up), mag: Math.round(Math.max(u.st.mag, u.st.atk) * T.atk * ka * up), def: Math.round(u.st.def * 0.7 * up), spr: Math.round(u.st.spr * 0.7 * up), spd: Math.round(u.st.spd * (T.big ? 0.8 : 1.05)) };
@@ -411,6 +412,8 @@ export class Battle {
       if (u.status.regen) { this.heal(u, Math.round(u.st.hp * 0.08)); u.status.regen--; if (!u.status.regen) delete u.status.regen; }
       if ((u.on?.includes('p_regen') || u.autoRegen) && u.alive) this.heal(u, Math.round(u.st.hp * 0.05), true);
       if (u.fx?.mpregen && u.alive) u.mp = Math.min(u.st.mp, u.mp + Math.max(1, Math.round(u.st.mp * u.fx.mpregen)));
+      if (u.fx?.asp_tide && u.alive) u.mp = Math.min(u.st.mp, u.mp + Math.max(1, Math.round(u.st.mp * u.fx.asp_tide / 100)));
+      if (u.fx?.asp_cleanse && u.alive && Math.random() < u.fx.asp_cleanse / 100) { const bad = ['poison', 'slow', 'silence', 'blind', 'stop', 'confuse', 'curse', 'sleep', 'stun', 'doom'].find(k => u.status[k]); if (bad) { delete u.status[bad]; this.pop(u, '淨化', '#fff4b0'); } }
       for (const k of ['slow', 'silence', 'blind', 'haste', 'stop', 'confuse', 'curse', 'reflect']) if (u.status[k] && u.status[k] < 90) { u.status[k]--; if (!u.status[k]) delete u.status[k]; }
       if (u.status.doom) { u.status.doom--; if (u.status.doom <= 0) { delete u.status.doom; this.pop(u, '死亡宣告', '#b06aff', true); u.hp = 0; } else this.pop(u, '倒數 ' + u.status.doom, '#b06aff'); }
       for (const k in u.buffs) { u.buffs[k].t--; if (u.buffs[k].t <= 0) delete u.buffs[k]; }
@@ -806,8 +809,14 @@ export class Battle {
     if (tgt.parry && S.type === 'phys' && u.side === 'enemy' && Math.random() < 0.3) { this.pop(tgt, '招架！', '#8ac8ff'); this.G.audio.sfx('guard'); this.counterQ = [tgt, u]; return 0; }
     if (tgt.stance === 'parry' && S.type === 'phys' && u.side === 'enemy') { this.pop(tgt, '招架！', '#8ac8ff'); this.G.audio.sfx('guard'); this.counterQ = [tgt, u]; return 0; }
     tgt.lastTags = tags; tgt.lastBy = u; const el0 = tags.find(x => ELEM[x]); const prevEl = tgt.lastEl; if (el0) tgt.lastEl = el0;
+    const hp0 = tgt.hp;
     this.damage(tgt, r.dmg, { weak: r.weak, crit: r.crit, resist: r.resist, imm: r.imm });
     const hand = ctx.hand;
+    if (u.side === 'party' && tgt.side === 'enemy' && !ctx.chained) { // legendary powers: the blow goes on to another foe
+      const others = () => this.foes.filter(f => f !== tgt && f.hp > 0);
+      if (u.fx?.asp_overkill && tgt.hp <= 0 && r.dmg > hp0) { const x = others()[0]; if (x) { this.pop(x, '貫穿', '#ffb04a'); this.damage(x, Math.max(1, Math.round((r.dmg - hp0) * u.fx.asp_overkill / 100)), {}); } }
+      if (u.fx?.asp_bounce && S.tgt === 'enemy' && Math.random() < u.fx.asp_bounce / 100) { const o2 = others(); const x = o2[Math.random() * o2.length | 0]; if (x) { this.pop(x, '彈射', '#ffe04a'); await this.strike(u, x, { ...S, pow: (S.pow || 1) * 0.6 }, tags, { ...ctx, chained: true, fast: true }); } }
+    }
     if (rx) await this.afterReaction(u, tgt, S, tags, rx);
     if (tgt.status.hidden && (S.tgt !== 'enemy' || tags.includes('light'))) { delete tgt.status.hidden; this.pop(tgt, '現形！', '#ffe04a'); }
     if (tgt.side === 'enemy' && u.side === 'party') {
@@ -1023,7 +1032,11 @@ export class Battle {
     if (phys && u.side === 'party' && ((u.key === 'opportunist' && helplessC) || (u.key === 'firstcut' && !u.firstCutUsed) || (this.pairs?.has('iaido') && wt === 'katana' && t.broken))) critC = 1;
     if (phys && wt === 'katana' && !u.drawn && u.side === 'party') critC = 1;
     if (S.iai && this.firstInRound === u) critC = 1;
-    const crit = Math.random() < critC; if (crit) dmg *= wt === 'katana' ? 2 : 1.5;
+    // legendary powers (see aspects.js)
+    const af = u.fx, tf = t.fx;
+    if (af && u.side === 'party' && t.side === 'enemy') { if (af.asp_exec && t.hp < t.st.hp * 0.3) dmg *= 1 + af.asp_exec / 100; if (af.asp_full && t.hp >= t.st.hp) dmg *= 1 + af.asp_full / 100; if (af.asp_weak && weak) dmg *= 1 + af.asp_weak / 100; if (af.asp_brkd && t.broken) dmg *= 1 + af.asp_brkd / 100; }
+    if (tf && t.side === 'party' && u.side === 'enemy') { if (tf.asp_higuard && t.hp > t.st.hp * 0.7) dmg *= 1 - Math.min(40, tf.asp_higuard) / 100; if (tf.asp_loguard && t.hp < t.st.hp * 0.35) dmg *= 1 - Math.min(60, tf.asp_loguard) / 100; }
+    const crit = Math.random() < critC; if (crit) dmg *= (wt === 'katana' ? 2 : 1.5) + (u.side === 'party' ? (af?.asp_critd || 0) / 100 : 0);
     dmg *= 0.92 + Math.random() * 0.16;
     // metal monsters shrug off everything but a critical hit
     if (t.E?.metal) return { dmg: crit ? t.hp : 1, weak: false, crit, resist: false };
@@ -1102,7 +1115,9 @@ export class Battle {
       if (u.side === 'enemy' && u.traits?.has('undying') && !u.revived && !u.noUndying && !u.broken && !(u.lastTags || []).some(x => x === 'light' || x === 'fire')) { u.revived = true; u.hp = Math.round(u.st.hp * 0.4); this.pop(u, '不死復活！', '#c84aff', true); this.effect('raise', u, 'dark', u); continue; }
       u.alive = false; u.dying = false;
       if (u.side === 'enemy') { this.fadeOut(u); this.G.audio.sfx('kill'); this.onEnemyDeath(u); }
-      else if (u.minion) { this.fadeOut(u); this.pop(u, `${u.name} 倒下了`, '#c8c8c8'); u.rec.hp = 0; }
+      else if (u.minion) { this.fadeOut(u); this.pop(u, `${u.name} 倒下了`, '#c8c8c8'); u.rec.hp = 0;
+        const ow = this.party.find(p => p.hero === u.owner); // a legendary power: the corpse explodes
+        if (ow?.fx?.asp_mnblast && this.foes.length) { this.pop(u, '屍爆！', '#b06aff', true); this.effect('explode', u, 'dark', u); for (const f of this.foes) this.damage(f, Math.max(1, Math.round(ow.st.mag * ow.fx.asp_mnblast / 100 * (f.resist?.includes('dark') ? 0.5 : 1))), { color: '#c08aff' }); this.recheck = true; } }
       else { u.spr.setFrame(BPOSE.ko); u.buffs = {}; u.status = {}; u.jumping = null; u.oy = 0; }
       this.queue = (this.queue || []).filter(q => q !== u);
     }
@@ -1122,6 +1137,12 @@ export class Battle {
     if (u.stoleGil) { this.S.gil += u.stoleGil; this.pop(u, `拿回了 ${u.stoleGil}G`, '#ffe04a'); u.stoleGil = 0; }
     if (u.traits.has('hunter')) for (const a of this.party) a.hunted = false;
     if (this.hasKey('harvest')) for (const a of this.allies) a.mp = Math.min(a.st.mp, a.mp + Math.round(a.st.mp * 0.08));
+    if (k?.side === 'party' && !k.minion && k.fx) { // legendary powers on a kill
+      const rest = this.foes.filter(f => f !== u && f.hp > 0), boom = (pct, el, color, label) => { if (!rest.length) return; this.pop(u, label, color, true); this.effect('explode', u, el, u); for (const f of rest) this.damage(f, Math.max(1, Math.round(u.st.hp * pct / 100 * (f.resist?.includes(el) ? 0.5 : 1))), { color }); this.recheck = true; };
+      if (k.fx.asp_shatter && (u.lastTags || []).includes('ice')) boom(k.fx.asp_shatter, 'ice', '#8ae0ff', '碎冰！');
+      if (k.fx.asp_blast) boom(k.fx.asp_blast, 'fire', '#ff8a3a', '殉爆！');
+      if (k.fx.asp_feast) for (const a of this.allies) this.heal(a, Math.round(a.st.hp * k.fx.asp_feast / 100), true);
+    }
     if (k?.side === 'party') {
       if (k.on?.includes('p_soulharvest')) k.mp = Math.min(k.st.mp, k.mp + Math.round(k.st.mp * 0.15));
       if (k.fx?.killHeal) this.heal(k, Math.round(k.st.hp * k.fx.killHeal), true);
@@ -1417,7 +1438,7 @@ export class Battle {
       this.S.kills[u.id] = (this.S.kills[u.id] || 0) + 1;
       const il = u.lootLv || u.lv, boss = u.E.boss || this.opts.boss;
       const n = boss ? 3 + Math.floor(Math.random() * 3) : u.rank === 2 ? 2 + (Math.random() < 0.5 ? 1 : 0) : u.rank === 1 ? (Math.random() < 0.7 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0) : Math.random() < 0.16 * dropMul ? 1 : 0;
-      for (let i = 0; i < n; i++) loot.push(rollItem(this.S, il + (boss ? 3 : u.rank || 0), { mf, quality: (boss ? 2.5 : u.rank === 2 ? 2 : u.rank === 1 ? 1.5 : 1) * LQ * FQ, minRarity: boss || u.rank === 2 || LQ > 1 && Math.random() < 0.5 ? 1 : 0 }));
+      for (let i = 0; i < n; i++) loot.push(rollItem(this.S, il + (boss ? 3 : u.rank || 0), { mf, quality: (boss ? 2.5 : u.rank === 2 ? 2 : u.rank === 1 ? 1.5 : 1) * LQ * FQ, minRarity: boss || u.rank === 2 || LQ > 1 && Math.random() < 0.5 ? 1 : 0, aspCh: this.opts.rift ? 0.04 + this.opts.rift.t * 0.004 : 0 }));
       for (let k = (boss ? 1.3 : u.rank === 2 ? 0.5 : u.rank === 1 ? 0.15 : 0.035) * rf; k > 0; k--) if (Math.random() < Math.min(1, k)) { const rn = rollRune(il, (boss ? 3 : u.rank || 0) + (LQ - 1) * 1.5); addItem(this.S, rn, 1); runes.push(rn); }
       if (Math.random() < 0.18) { const pot = il < 15 ? 'potion' : il < 35 ? 'hipotion' : 'i_hp3'; addItem(this.S, pot, 1); drops.push(pot); }
       if (Math.random() < 0.08) { addItem(this.S, il < 25 ? 'ether' : 'hiether', 1); drops.push(il < 25 ? 'ether' : 'hiether'); }

@@ -1,12 +1,12 @@
 // Menus and windows: dialogue, choices, the main menu, shops, inns, notices and little overlays.
 import { DIFF, DIFF_ORDER, balanceFor } from './balance.js?v=1';
 import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, ECHO_ORDER, EXP_NEXT, SUMMONS, STAR_COST, BOND_EXP, ELEM, WPN, ICON , clsOf } from './data.js?v=1';
-import { heroStats, skillsOf, apUsed, apCap, equip, canEquip, setEcho, togglePassive, starUp, ownedEchoes, itemName, addItem, echoSkills, EQUIP_SLOTS, SLOT_N, slotFits, gearFx, artsOf, spellsOf, masteryLv, hands, paperLook, itemLook, gearLook , LEAD_TEXT, SET_SLOTS, saveOutfit, wearOutfit, outfitWhere, outfitWorn } from './party.js?v=1';
+import { heroStats, skillsOf, apUsed, apCap, equip, canEquip, setEcho, togglePassive, starUp, ownedEchoes, itemName, addItem, echoSkills, EQUIP_SLOTS, SLOT_N, slotFits, gearFx, artsOf, spellsOf, masteryLv, hands, paperLook, itemLook, gearLook , LEAD_TEXT, clampHP, SET_SLOTS, saveOutfit, wearOutfit, outfitWhere, outfitWorn } from './party.js?v=1';
 import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N, APT, SHIELD_KINDS, TIER_N, FAM_N, TRAIT_N, DROP_N } from './content.js?v=1';
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
 import { STATE_N, STATE_DESC, REACTIONS, PAIRS, huntText, NEW_ECHOES } from './depth.js?v=1';
-import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken, socketItem, insertRune, UNIQUES, BASES, AFFIX_LIST, previewGear, canWear, treeLabel } from './loot.js?v=1';
+import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, awaken, socketItem, setAspect, insertRune, UNIQUES, BASES, AFFIX_LIST, previewGear, canWear, treeLabel } from './loot.js?v=1';
 import { RUNES, RUNEWORDS, runeColor, runeFx, matchRuneword, runewordsFor, runeStr, maxSockets, sockKind, RW_SLOT_N } from './runes.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
@@ -15,6 +15,7 @@ import { lookOf } from './field.js?v=1';
 import { renderWeaponIcon, setDepth } from './voxel.js?v=1';
 import { renderPortrait } from './paperdoll.js?v=1';
 import { SET_ITEMS } from './loot.js?v=1';
+import { ASPECTS, aspectText, aspectName, aspectFits } from './aspects.js?v=1';
 const GEAR_SET_NAME = (p) => SET_ITEMS[p]?.name || p;
 
 const $ = (s) => document.querySelector(s);
@@ -319,7 +320,7 @@ export class UI {
     const pic = itemIcon(g, true);
     const ll = lootLines(G), lowLv = id && G.lvReq && this.S.heroes[id]?.lv < G.lvReq;
     return `<div class="gi">${pic ? `<img class="gi-pic" src="${pic}">` : ''}<h4 style="color:${G.rarColor || '#fff'}">${G.name}</h4>${G.rarity >= 2 || G.rw ? `<div class="gi-kind" style="color:${G.rarColor}">${G.baseName}</div>` : ''}<div class="gi-kind">${G.rarity != null ? (G.rw ? '符文之語' : RARITY[G.rarity].n) + '・' : ''}${this.gearKind(G)}${G.il ? `　物品等級 ${G.il}` : ''}</div>${G.lvReq > 1 ? `<div class="gi-kind" style="color:${lowLv ? '#ff6a6a' : '#aaa'}">需要等級 ${G.lvReq}</div>` : ''}
-      ${this.sockHTML(G)}${this.rollHTML(G)}${ll.length ? `<div class="gi-fx">${ll.map(x => `<span style="color:#9ab8ff">${x}</span>`).join('')}</div>` : ''}${G.flavor ? `<div class="gi-flavor" style="color:#c8a060;font-style:italic">「${G.flavor}」</div>` : ''}${G.lootSet ? this.setHTML(G.lootSet, id) : ''}
+      ${this.sockHTML(G)}${this.rollHTML(G)}${ll.length ? `<div class="gi-fx">${ll.map(x => `<span style="color:#9ab8ff">${x}</span>`).join('')}</div>` : ''}${G.aspect ? `<div class="gi-asp" style="color:#ff9a3a;margin:4px 0">✦ 傳奇特效【${aspectName(G.aspect)}】${aspectText(G.aspect)}</div>` : ''}${G.flavor ? `<div class="gi-flavor" style="color:#c8a060;font-style:italic">「${G.flavor}」</div>` : ''}${G.lootSet ? this.setHTML(G.lootSet, id) : ''}
       <div>${this.gearLine(g).split('　')[0] || ''}</div>
       ${W ? `<div class="gi-trait">${W.trait}</div>` : ''}${G.type === 'shield' ? `<div class="gi-trait">盾：被物理攻擊時有機會完全格擋</div>` : ''}
       ${f.length ? `<div class="gi-fx">${f.map(x => `<span>${x}</span>`).join('')}</div>` : ''}${G.desc ? `<div>${G.desc}</div>` : ''}</div>`;
@@ -650,6 +651,10 @@ export class UI {
         const list = Object.values(UNIQUES).sort((a, b) => a.lv - b.lv);
         await this.choose(list.map(u => ({ label: `<span style="color:#c8a060">${u.name}</span>`, sub: `Lv ${u.lv}　${this.gearKind(GEAR[previewGear('u', u.id)])}` })), { title: `暗金　${list.length} 件`, cls: 'items', info: (k) => pv('u', list[k].id) });
       }],
+      ['傳奇特效', '#ff9a3a', async () => {
+        const list = Object.entries(ASPECTS), W = { w: '武器・飾品', a: '防具・盾', x: '任何裝備' };
+        await this.choose(list.map(([id, A]) => ({ label: `<span style="color:#ff9a3a">${A.n}</span>`, sub: W[A.where] })), { title: `傳奇特效　${list.length} 種`, cls: 'items', info: (k) => { const [id, A] = list[k]; return `<div class="gi"><h4 style="color:#ff9a3a">✦ ${A.n}</h4><div>${A.d.replace('%v', `${A.lo}～${A.hi}`)}</div><div class="gi-kind">可以出現在：${W[A.where]}</div><p class="dim">物品等級 40 以上的暗金約三成帶有一個傳奇特效（名字後面有 ✦），秘境的稀有裝備偶爾也有。在鐵匠可以把特效萃取出來，再鑲進魔法或稀有裝備。</p></div>`; } });
+      }],
       ['套裝', '#3ae06a', async () => {
         const list = Object.values(SETS).sort((a, b) => a.lv - b.lv);
         for (;;) {
@@ -695,7 +700,7 @@ export class UI {
       }],
     ];
     for (;;) {
-      const counts = [Object.keys(UNIQUES).length, Object.keys(SETS).length, Object.keys(RUNEWORDS).length, RUNES.length, AFFIX_LIST.length, BASES.length, Object.values(ITEMS).filter(it => it.cat && it.cat !== 'key').length];
+      const counts = [Object.keys(UNIQUES).length, Object.keys(ASPECTS).length, Object.keys(SETS).length, Object.keys(RUNEWORDS).length, RUNES.length, AFFIX_LIST.length, BASES.length, Object.values(ITEMS).filter(it => it.cat && it.cat !== 'key').length];
       const i = await this.choose(cats.map(([n, c], k) => ({ label: `<span style="color:${c}">${n}</span>`, sub: counts[k] + '' })), { title: '寶物圖鑑', cls: 'small' });
       if (i < 0) return;
       await cats[i][2]();
@@ -845,10 +850,11 @@ export class UI {
     const owned = () => { const out = []; for (const id of Object.keys(S.items)) if (S.items[id] > 0 && GEAR[id] && GEAR[id].tier != null && GEAR[id].tier <= maxTier) out.push({ id, where: null }); for (const h of Object.keys(S.heroes)) for (const sl of EQUIP_SLOTS) { const g = S.heroes[h].equip[sl]; if (g && GEAR[g] && GEAR[g].tier != null) out.push({ id: g, where: [h, sl] }); } return out; };
     const swap = (o, nid) => { if (o.where) S.heroes[o.where[0]].equip[o.where[1]] = nid; else { addItem(S, o.id, -1); if (S.items[o.id] <= 0) delete S.items[o.id]; addItem(S, nid, 1); } };
     for (;;) {
-      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#e0c080">符文</span>', sub: '孔・符文之語' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#e0c080">符文</b>：幫普通裝備打孔、鑲嵌符文，做出符文之語。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
+      const m = await this.choose([{ label: '強化裝備', sub: '+1～+5' }, { label: '鑲嵌寶石', sub: '屬性' }, { label: '<span style="color:#e0c080">符文</span>', sub: '孔・符文之語' }, { label: '<span style="color:#ffd86a">神裝覺醒</span>', sub: '★' }, { label: '<span style="color:#ff9a3a">傳奇特效</span>', sub: `萃取・鑲入　存著 ${(S.aspects || []).length} 個` }], { title: `鐵匠　<span class="gil">${S.gil} G</span>`, info: '<p><b>強化</b>：用強化石把裝備強化到+5，每一級能力+8%。</p><p><b>鑲嵌</b>：用屬性寶石讓武器帶上屬性（打弱點用），或讓防具抵抗那個屬性。</p><p><b style="color:#e0c080">符文</b>：幫普通裝備打孔、鑲嵌符文，做出符文之語。</p><p><b style="color:#ff9a3a">傳奇特效</b>：把暗金上的傳奇特效萃取出來（那件裝備會消失），再鑲進魔法或稀有裝備。</p><p><b style="color:#ffd86a">神裝覺醒</b>：★ 神裝不會被淘汰。早期撿到的神裝，可以在這裡重新鍛造成你現在等級的水準：底材換成同類最好的、每個詞綴升到最高一階、暗金和套裝的能力跟著變強，所有數值仍然是滿值。等級再升高還可以再覺醒。</p>' });
       if (m < 0) return;
       if (m === 2) { await this.runeMenu(owned, parse); continue; }
       if (m === 3) { await this.awakenMenu(owned, parse); continue; }
+      if (m === 4) { await this.aspectMenu(owned, parse); continue; }
       for (;;) {
         const list = owned().filter(o => m === 0 ? parse(o.id).n < 5 : GEAR[o.id].slot !== 'acc');
         if (!list.length) { this.toast('沒有可以處理的裝備'); break; }
@@ -873,6 +879,49 @@ export class UI {
           S.gil -= cost; addItem(S, gems[j], -1); if (S.items[gems[j]] <= 0) delete S.items[gems[j]];
           swap(o, make(P.base, P.n, el)); this.G.audio.sfx('levelup'); this.toast(`${GEAR[make(P.base, P.n, el)].name} 完成！`);
         }
+      }
+    }
+  }
+  // legendary powers: draw one out of its piece (the piece is lost) and keep it, or set a kept one into a magic or rare piece
+  async aspectMenu(owned, parse) {
+    const S = this.S; S.aspects ||= [];
+    const EXTRACT = 5000, setCost = (G) => Math.round(2000 + (G.il || 1) * (G.il || 1) * 2);
+    const line = (a) => `<span style="color:#ff9a3a">【${aspectName(a)}】</span>${aspectText(a)}`;
+    const info = '<p>部分暗金（物品等級 40 以上，約三成）帶著一個<b style="color:#ff9a3a">傳奇特效</b>，名字後面有 ✦。秘境裡的稀有裝備偶爾也有。</p><p><b>萃取</b>：花 5000 G 把特效抽出來存著，那件裝備會消失。</p><p><b>鑲入</b>：把存著的特效鑲進一件魔法或稀有裝備（一件只能有一個）。武器和飾品、防具和盾能鑲的特效不一樣。</p>';
+    for (;;) {
+      const m = await this.choose([{ label: '萃取特效', sub: `${EXTRACT} G` }, { label: '鑲入特效', sub: '魔法・稀有裝備' }, { label: '我存著的特效', sub: `${S.aspects.length} 個` }], { title: `傳奇特效　<span class="gil">${S.gil} G</span>`, info });
+      if (m < 0) return;
+      if (m === 0) {
+        const list = Object.keys(S.items).filter(id => S.items[id] > 0 && GEAR[id]?.aspect);
+        if (!list.length) { await this.info('<p>背包裡沒有帶傳奇特效的裝備（名字後面有 ✦）。</p><p>裝備中的要先卸下。</p>', '萃取特效'); continue; }
+        const i = await this.choose(list.map(id => ({ label: `<span style="color:${GEAR[id].rarColor}">${GEAR[id].name}</span>`, sub: aspectName(GEAR[id].aspect) })), { title: '萃取哪一件的特效？', info: (k) => this.gearHTML(list[k]) });
+        if (i < 0) continue;
+        const id = list[i], a = GEAR[id].aspect;
+        if (S.gil < EXTRACT) { this.toast('金幣不夠'); continue; }
+        if (!await this.yesno(`萃取「${GEAR[id].name}」的【${aspectName(a)}】？
+${aspectText(a)}
+需要 ${EXTRACT} G，這件裝備會消失。`)) continue;
+        S.gil -= EXTRACT; S.aspects.push([...a]); this.removeGear(id); this.G.audio.sfx('item'); this.hud(); this.toast(`存下了【${aspectName(a)}】`);
+      }
+      if (m === 1) {
+        if (!S.aspects.length) { this.toast('還沒有存著的特效'); continue; }
+        const j = await this.choose(S.aspects.map(a => ({ label: `<span style="color:#ff9a3a">${aspectName(a)}</span>`, sub: ASPECTS[a[0]].where === 'w' ? '武器・飾品' : ASPECTS[a[0]].where === 'a' ? '防具・盾' : '任何裝備' })), { title: '鑲入哪一個特效？', info: (k) => `<div class="gi">${line(S.aspects[k])}</div>` });
+        if (j < 0) continue;
+        const a = S.aspects[j], seen = new Set(), list = [];
+        for (const o of owned()) { const uid = parse(o.id).base, sp = S.loot?.[uid], G = GEAR[o.id]; if (!sp || seen.has(uid) || sp.asp || ![1, 2].includes(sp.r) || sp.rw || !aspectFits(a[0], G)) continue; seen.add(uid); list.push({ ...o, uid }); }
+        if (!list.length) { await this.info('<p>沒有能鑲這個特效的魔法或稀有裝備。</p>', '鑲入特效'); continue; }
+        const i = await this.choose(list.map(o => ({ label: `<span style="color:${GEAR[o.id].rarColor}">${GEAR[o.id].name}</span>`, sub: `${setCost(GEAR[o.id])} G　${o.where ? HEROES[o.where[0]].name + '裝備中' : '背包'}` })), { title: `鑲入【${aspectName(a)}】`, info: (k) => this.gearHTML(list[k].id) + `<div class="gi">${line(a)}</div>` });
+        if (i < 0) continue;
+        const o = list[i], c = setCost(GEAR[o.id]);
+        if (S.gil < c) { this.toast('金幣不夠'); continue; }
+        if (!await this.yesno(`把【${aspectName(a)}】鑲進「${GEAR[o.id].name}」？
+需要 ${c} G。`)) continue;
+        S.gil -= c; S.aspects.splice(j, 1); setAspect(S, o.uid, a); clampHP(S); this.G.audio.sfx('levelup'); this.hud(); this.toast(`鑲好了：${GEAR[o.uid]?.name || ''}`);
+      }
+      if (m === 2) {
+        if (!S.aspects.length) { this.toast('還沒有存著的特效'); continue; }
+        const j = await this.choose(S.aspects.map(a => ({ label: `<span style="color:#ff9a3a">${aspectName(a)}</span>`, sub: aspectText(a) })), { title: '存著的特效', info: (k) => `<div class="gi">${line(S.aspects[k])}<p class="dim">選一個可以丟掉它</p></div>` });
+        if (j >= 0 && await this.yesno(`丟掉【${aspectName(S.aspects[j])}】？`)) S.aspects.splice(j, 1);
       }
     }
   }
