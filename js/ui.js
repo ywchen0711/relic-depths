@@ -10,6 +10,7 @@ import { SETS, setBonusFx as setBonus, lootLines, RARITY, rollLines, lootLevel, 
 import { RUNES, RUNEWORDS, runeColor, runeFx, matchRuneword, runewordsFor, runeStr, maxSockets, sockKind, RW_SLOT_N } from './runes.js?v=1';
 import { CLASSES, TREES } from './classes.js?v=1';
 import { monsterPx } from './pixel.js?v=1';
+import { PREVIEW } from './monsters.js?v=1';
 import { personSheet, battleSheet } from './pixel.js?v=1';
 import { lookOf } from './field.js?v=1';
 import { renderWeaponIcon, setDepth } from './voxel.js?v=1';
@@ -708,13 +709,15 @@ export class UI {
   }
   async bestiaryMenu() {
     const S = this.S, kills = S.kills || {}, seen = S.dropSeen || {};
-    const list = Object.keys(ENEMIES).filter(id => !id.endsWith('_trial')).sort((a, b) => ENEMIES[a].lv - ENEMIES[b].lv);
+    const fresh0 = (id) => !(kills[id]) && !S.flags['seen_' + id] && PREVIEW.has(id);
+    const list = Object.keys(ENEMIES).filter(id => !id.endsWith('_trial')).sort((a, b) => (fresh0(b) - fresh0(a)) || ENEMIES[a].lv - ENEMIES[b].lv);
     const met = list.filter(id => kills[id] || S.flags['seen_' + id]).length;
     const pic = (id) => { try { const E = ENEMIES[id]; const px = monsterPx(E.kind, E.colors); return px.canvas(px.res === 2 ? 2 : 3).toDataURL(); } catch (e) { return ''; } };
-    await this.choose(list.map((id, n) => { const k = kills[id] || 0, E = ENEMIES[id]; return { label: k || S.flags['seen_' + id] ? E.name : '？？？', sub: `Lv ${E.lv}${k ? '　' + k : ''}` }; }), {
+    const known = (id) => kills[id] || S.flags['seen_' + id] || PREVIEW.has(id);
+    await this.choose(list.map((id, n) => { const k = kills[id] || 0, E = ENEMIES[id], fresh = !k && !S.flags['seen_' + id] && PREVIEW.has(id); return { label: known(id) ? E.name + (fresh ? ' <span style="color:#7affa0;font-size:11px">NEW</span>' : '') : '？？？', sub: `Lv ${E.lv}${k ? '　' + k : ''}` }; }), {
       title: `怪物圖鑑　${met}/${list.length}`, cls: 'items', info: (n) => {
         const id = list[n], E = ENEMIES[id], k = kills[id] || 0;
-        if (!k && !S.flags['seen_' + id]) return '<div class="gi"><h4>？？？</h4><p>還沒有遇過。</p></div>';
+        if (!known(id)) return '<div class="gi"><h4>？？？</h4><p>還沒有遇過。</p></div>';
         const rev = new Set(S.flags['seen_' + id] || []); const weak = k >= 3 ? E.weak : E.weak.filter(w => rev.has(w));
         return `<div class="gi bst"><img src="${pic(id)}"><h4>${E.name}${E.boss ? '　〔頭目〕' : ''}</h4><div class="gi-kind">Lv ${E.lv}　${FAM_N[E.fam] || ''}系　HP ${Math.round(E.hp * balanceFor(id, E, S.settings.diff)[0])}　打倒 ${k} 隻</div>
           <div>${E.traits.map(t => TRAIT_N[t] ? `<div class="gi-trait">${TRAIT_N[t][0]} ${TRAIT_N[t][1]}：${TRAIT_N[t][2]}</div>` : '').join('')}</div>

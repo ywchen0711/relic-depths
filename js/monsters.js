@@ -445,6 +445,8 @@ const R_ = [
   ['m_x31', '聖騎魔像', 'golem', 44, { body: '#e8e0c8' }, 'light', { traits: ['armor', 'aura'] }], ['m_x32', '星之精', 'elemental', 38, { body: '#d8b0ff' }, 'light', { traits: ['reflect', 'regen'] }],
 ];
 export const BESTIARY_NEW = [];
+// new arrivals the bestiary shows before they are met, so a player can see what is coming
+export const PREVIEW = new Set(['m_gst1', 'm_gst2', 'm_gst3', 'm_shg1', 'm_shg2', 'm_shg3', 'm_bub1', 'm_bub2', 'm_bub3', 'm_rot1', 'm_rot2', 'm_rot3', 'm_gkn1', 'm_gkn2', 'm_gkn3', 'm_wyg1', 'm_wyg2', 'm_wyg3']);
 for (const [id, name, kind, lv, colors, el, ex = {}] of R_) {
   const k = K[kind], [mh, ma, md, mm, ms] = k.m;
   const hp = Math.round((22 + 12 * lv + 0.45 * lv * lv) * mh * (ex.hpMul || 1) * (ex.metal ? 0 : 1)) || 0;
