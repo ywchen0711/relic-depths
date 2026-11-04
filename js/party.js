@@ -390,3 +390,25 @@ export function paperLook(S, id, equipOverride) {
   if (bd && eq.body !== 'a_cloth') { const f = gearLook(bd, id); Object.assign(L, f); L.top2 = bd.style === 'robe' ? (H.look.top2 || H.color) : H.look.top; if (bd.style !== 'heavy' && !g('arms')?.style?.includes('heavy')) L.pauldron = undefined; }
   return L;
 }
+// saved outfits: each hero keeps a few sets of gear to swap between
+export const SET_SLOTS = 5;
+export function saveOutfit(S, id, n) { const h = S.heroes[id]; (h.outfits ||= [])[n] = { eq: Object.fromEntries(EQUIP_SLOTS.map(sl => [sl, h.equip[sl] || null])) }; }
+// where a piece of a saved set is now: worn by this hero, in the bag, worn by someone else, in the stash, or gone
+export function outfitWhere(S, id, g) {
+  if (EQUIP_SLOTS.some(sl => S.heroes[id].equip[sl] === g)) return { at: 'on' };
+  if (S.items[g] > 0) return { at: 'bag' };
+  for (const o in S.heroes) if (o !== id && EQUIP_SLOTS.some(sl => S.heroes[o].equip[sl] === g)) return { at: 'hero', who: o };
+  if ((S.stash || []).includes(g)) return { at: 'stash' };
+  return { at: 'gone' };
+}
+export function outfitWorn(S, id, n) { const o = S.heroes[id].outfits?.[n]; return !!o && EQUIP_SLOTS.every(sl => (o.eq[sl] || null) === (S.heroes[id].equip[sl] || null)); }
+// put a saved set on; pieces that are not at hand leave their slot as it is. Returns the ones that were missing
+export function wearOutfit(S, id, n) {
+  const h = S.heroes[id], o = h.outfits?.[n]; if (!o) return null;
+  const miss = [];
+  for (const sl of EQUIP_SLOTS) { const g = o.eq[sl] || null; if (h.equip[sl] === g) continue; if (g && !(GEAR[g] && canEquip(id, g, S) && (S.items[g] > 0 || EQUIP_SLOTS.some(s => h.equip[s] === g)))) { miss.push(g); continue; } if (h.equip[sl]) { addItem(S, h.equip[sl], 1); h.equip[sl] = null; } }
+  for (const sl of EQUIP_SLOTS) { const g = o.eq[sl] || null; if (!g || h.equip[sl] === g || miss.includes(g) || !(S.items[g] > 0)) continue; equip(S, id, sl, g); }
+  clampHP(S); return miss;
+}
+// which heroes keep this piece in one of their saved sets
+export function inOutfit(S, g) { return Object.keys(S.heroes).filter(id => (S.heroes[id].outfits || []).some(o => o && EQUIP_SLOTS.some(sl => o.eq[sl] === g))); }

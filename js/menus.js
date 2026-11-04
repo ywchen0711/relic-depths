@@ -2,7 +2,7 @@
 // the waypoints. They are added to the UI class from ui.js so they share its chooser and tooltips.
 import { UI, fullSprite, portrait } from './ui.js?v=1';
 import { HEROES, SKILLS, GEAR, ITEMS, ELEM, clsOf } from './data.js?v=1';
-import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx, hireHero, dismissHero, isLead, MAX_HEROES } from './party.js?v=1';
+import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx, hireHero, dismissHero, isLead, MAX_HEROES, inOutfit } from './party.js?v=1';
 import { CLASSES, CLASS_ORDER, TREES, SKILL_INFO, SKILL_MAX, TREE_REQ } from './classes.js?v=1';
 import { RARITY, rollItem, gambleItem, shopStock, sellPrice, dropLoot } from './loot.js?v=1';
 import { ACTS, DIFFS, WP_LEVELS, mapId } from './dungeon.js?v=1';
@@ -263,14 +263,15 @@ P.sellMenu = function () {
       for (const g of [...picked]) if (!S.items[g]) picked.delete(g);
       sel = Math.max(0, Math.min(sel, list.length - 1));
     };
+    const kept = (g) => inOutfit(S, g).length > 0;
     const total = () => [...picked].reduce((s, g) => s + sellPrice(GEAR[g]) * (S.items[g] || 0), 0);
     const build = () => {
       refresh();
-      const all = list.length && list.every(g => picked.has(g));
+      const all = list.some(g => !kept(g)) && list.filter(g => !kept(g)).every(g => picked.has(g));
       wrap.innerHTML = `<div class="ch-box noanim"><div class="ch-title">賣裝備　<span class="gil">${S.gil} G</span></div>
         <details class="sl-more"${f.open ? ' open' : ''}><summary>🔍 篩選・排序：${this.filterSummary(f)}　<small>${list.length} 件</small></summary>${this.filterBarsHTML(f)}</details>
-        <div class="ch-cols"><div class="ch-list">${list.length ? list.map((g, i) => `<div class="ch-it${i === sel ? ' sel' : ''}" data-i="${i}"><span class="sl-box${picked.has(g) ? ' on' : ''}">${picked.has(g) ? '✔' : ''}</span><span class="ch-l">${col(GEAR[g])}${S.items[g] > 1 ? ` ×${S.items[g]}` : ''}</span><span class="ch-s">${sellPrice(GEAR[g])} G</span></div>`).join('') : '<div class="dim" style="padding:12px">沒有符合的裝備</div>'}</div>
-        <div class="ch-info">${list[sel] ? this.gearHTML(list[sel]) + `<div style="color:#ffe04a">賣價 ${sellPrice(GEAR[list[sel]])} G</div>` + this.whoCanWear(list[sel]) : ''}</div></div>
+        <div class="ch-cols"><div class="ch-list">${list.length ? list.map((g, i) => `<div class="ch-it${i === sel ? ' sel' : ''}" data-i="${i}"><span class="sl-box${picked.has(g) ? ' on' : ''}">${picked.has(g) ? '✔' : ''}</span><span class="ch-l">${col(GEAR[g])}${S.items[g] > 1 ? ` ×${S.items[g]}` : ''}${kept(g) ? ' <span title="存在裝備組合裡">💾</span>' : ''}</span><span class="ch-s">${sellPrice(GEAR[g])} G</span></div>`).join('') : '<div class="dim" style="padding:12px">沒有符合的裝備</div>'}</div>
+        <div class="ch-info">${list[sel] ? this.gearHTML(list[sel]) + `<div style="color:#ffe04a">賣價 ${sellPrice(GEAR[list[sel]])} G</div>` + (kept(list[sel]) ? `<div style="color:#8cf">💾 存在${inOutfit(S, list[sel]).map(h => HEROES[h].name).join('、')}的裝備組合裡（全選時會跳過）</div>` : '') + this.whoCanWear(list[sel]) : ''}</div></div>
         <div class="sl-foot"><span class="sl-btn" data-a="all">${all ? '取消全選' : '全選目前列出的'}</span><span class="sl-btn" data-a="none">清除勾選</span><span class="sl-sum">已選 ${picked.size} 件　共 <b>${total()} G</b></span><span class="sl-btn go${picked.size ? '' : ' dis'}" data-a="sell">賣出</span><span class="sl-btn" data-a="back">離開</span></div>
         <div class="sl-help">↑↓ 移動　Z 勾選　←→ 換稀有度　R 篩選・排序　M 全選　C 賣出　X 離開</div></div>`;
       this.wireFilterBars(wrap, f, {}, () => { sel = 0; build(); });
@@ -283,14 +284,15 @@ P.sellMenu = function () {
     let busy = false;
     const act = async (a) => {
       if (busy) return;
-      if (a === 'all') { const all = list.length && list.every(g => picked.has(g)); for (const g of list) all ? picked.delete(g) : picked.add(g); G.audio.sfx('move'); build(); }
+      if (a === 'all') { const free = list.filter(g => !kept(g)), all = free.length && free.every(g => picked.has(g)); for (const g of free) all ? picked.delete(g) : picked.add(g); G.audio.sfx('move'); build(); }
       if (a === 'none') { picked.clear(); G.audio.sfx('move'); build(); }
       if (a === 'back') { off(); wrap.remove(); G.audio.sfx('cancel'); res(); }
       if (a === 'sell') {
         if (!picked.size) { G.audio.sfx('error'); return; }
-        const gs = [...picked], sum = total(), good = gs.filter(g => (GEAR[g].rarity ?? 0) >= 2).length;
+        const gs = [...picked], sum = total(), good = gs.filter(g => (GEAR[g].rarity ?? 0) >= 2).length, ks = gs.filter(kept).length;
         busy = true; wrap.style.visibility = 'hidden';
-        const ok = await ui.yesno(`賣掉 ${gs.length} 件裝備，共 ${sum} G？${good ? `\n（其中 ${good} 件是稀有、套裝或暗金）` : ''}`);
+        const ok = await ui.yesno(`賣掉 ${gs.length} 件裝備，共 ${sum} G？${good ? `\n（其中 ${good} 件是稀有、套裝或暗金）` : ''}${ks ? `
+（其中 ${ks} 件存在裝備組合裡）` : ''}`);
         wrap.style.visibility = ''; busy = false;
         if (!ok) return;
         for (const g of gs) { const n = S.items[g] || 0; for (let j = 0; j < n; j++) ui.removeGear(g); }

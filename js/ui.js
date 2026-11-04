@@ -1,7 +1,7 @@
 // Menus and windows: dialogue, choices, the main menu, shops, inns, notices and little overlays.
 import { DIFF, DIFF_ORDER, balanceFor } from './balance.js?v=1';
 import { HEROES, ECHOES, PASSIVES, SKILLS, ITEMS, GEAR, ECHO_ORDER, EXP_NEXT, SUMMONS, STAR_COST, BOND_EXP, ELEM, WPN, ICON , clsOf } from './data.js?v=1';
-import { heroStats, skillsOf, apUsed, apCap, equip, canEquip, setEcho, togglePassive, starUp, ownedEchoes, itemName, addItem, echoSkills, EQUIP_SLOTS, SLOT_N, slotFits, gearFx, artsOf, spellsOf, masteryLv, hands, paperLook, itemLook, gearLook , LEAD_TEXT } from './party.js?v=1';
+import { heroStats, skillsOf, apUsed, apCap, equip, canEquip, setEcho, togglePassive, starUp, ownedEchoes, itemName, addItem, echoSkills, EQUIP_SLOTS, SLOT_N, slotFits, gearFx, artsOf, spellsOf, masteryLv, hands, paperLook, itemLook, gearLook , LEAD_TEXT, SET_SLOTS, saveOutfit, wearOutfit, outfitWhere, outfitWorn } from './party.js?v=1';
 import { WTYPES, fxText, ITEM_CATS, SCHOOL_N, ARTS_BY_TYPE, MASTERY_AT, STYLE_N, APT, SHIELD_KINDS, TIER_N, FAM_N, TRAIT_N, DROP_N } from './content.js?v=1';
 import { ENEMIES } from './data.js?v=1';
 import { GRIND_DEFAULT, GRIND_OPTS } from './grind.js?v=1';
@@ -430,15 +430,17 @@ export class UI {
     for (;;) {
       const h = S.heroes[id];
       const rows = EQUIP_SLOTS.map(sl => ({ label: SLOT_N[sl], sub: GEAR[h.equip[sl]]?.name || (sl === 'L' && GEAR[h.equip.R]?.hands === 2 ? '（雙手武器）' : '—') }));
-      rows.push({ label: '⚙ 最強裝備', sub: '自動挑選' }, { label: '全部卸下', sub: '' }, { label: '換人', sub: '◀ ▶' });
+      rows.push({ label: '💾 裝備組合', sub: `M　${(h.outfits || []).filter(Boolean).length}/${SET_SLOTS}` }, { label: '⚙ 最強裝備', sub: '自動挑選' }, { label: '全部卸下', sub: '' }, { label: '換人', sub: '◀ ▶' });
       const doll = this.dollHTML(paperLook(S, id), HEROES[id].name);
-      const i = await this.choose(rows, { title: HEROES[id].name + '　裝備', info: (k) => `<div class="eq-wrap">${doll}<div class="eq-side">${k < EQUIP_SLOTS.length && h.equip[EQUIP_SLOTS[k]] ? this.gearHTML(h.equip[EQUIP_SLOTS[k]], id) : this.statusHTML(id)}</div></div>`, start, lr: (k, d) => { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + d + all.length) % all.length]; start = k; return 'close'; } });
+      const i = await this.choose(rows, { title: HEROES[id].name + '　裝備', info: (k) => `<div class="eq-wrap">${doll}<div class="eq-side">${k < EQUIP_SLOTS.length && h.equip[EQUIP_SLOTS[k]] ? this.gearHTML(h.equip[EQUIP_SLOTS[k]], id) : this.statusHTML(id)}</div></div>`, start, onMap: true, lr: (k, d) => { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + d + all.length) % all.length]; start = k; return 'close'; } });
       if (i === -2) continue;
+      if (i === -3) { await this.outfitMenu(id); continue; }
       if (i < 0) return;
       start = i;
-      if (i === EQUIP_SLOTS.length) { this.optimize(id); this.G.audio.sfx('item'); this.toast('已換上最強裝備'); continue; }
-      if (i === EQUIP_SLOTS.length + 1) { for (const sl of EQUIP_SLOTS) if (h.equip[sl] && !(sl === 'R' && !GEAR[h.equip.R]?.type)) equip(S, id, sl, null); this.G.audio.sfx('item'); continue; }
-      if (i === EQUIP_SLOTS.length + 2) { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + 1) % all.length]; continue; }
+      if (i === EQUIP_SLOTS.length) { await this.outfitMenu(id); continue; }
+      if (i === EQUIP_SLOTS.length + 1) { this.optimize(id); this.G.audio.sfx('item'); this.toast('已換上最強裝備'); continue; }
+      if (i === EQUIP_SLOTS.length + 2) { for (const sl of EQUIP_SLOTS) if (h.equip[sl] && !(sl === 'R' && !GEAR[h.equip.R]?.type)) equip(S, id, sl, null); this.G.audio.sfx('item'); continue; }
+      if (i === EQUIP_SLOTS.length + 3) { const all = [...S.party, ...S.reserve]; id = all[(all.indexOf(id) + 1) % all.length]; continue; }
       const slot = EQUIP_SLOTS[i];
       for (;;) { // the pieces for this slot; the filter brings you back here
       const fe = this.gfEquip ||= { rar: 0, kind: 0, who: 'all', tr: [], sort: 0 }, ctx = { kind: false, who: false };
@@ -452,6 +454,27 @@ export class UI {
       if (j >= 1) { equip(S, id, slot, j === 1 ? null : opts[j - 2]); this.G.audio.sfx('item'); }
       break;
       }
+    }
+  }
+  // saved outfits: store what the hero wears now, put a stored set back on in one go
+  async outfitMenu(id) {
+    const S = this.S; let st = 0;
+    const where = (g) => { const w = outfitWhere(S, id, g); return w.at === 'on' ? '' : w.at === 'bag' ? '' : w.at === 'hero' ? `（在${HEROES[w.who].name}身上）` : w.at === 'stash' ? '（在倉庫）' : '（已經不在了）'; };
+    const ok = (g) => ['on', 'bag'].includes(outfitWhere(S, id, g).at) && canEquip(id, g, S);
+    const look = (n) => { const o = S.heroes[id].outfits?.[n]; if (!o) return '<div class="dim">空的。選這一格把現在穿的裝備存進來。</div>'; const eq = { ...S.heroes[id].equip }; for (const sl of EQUIP_SLOTS) eq[sl] = o.eq[sl] && ok(o.eq[sl]) ? o.eq[sl] : (o.eq[sl] ? eq[sl] : null);
+      return `<div class="eq-wrap">${this.dollHTML(paperLook(S, id, eq), '組合 ' + (n + 1))}<div class="eq-side">${EQUIP_SLOTS.filter(sl => o.eq[sl]).map(sl => { const g = o.eq[sl], G = GEAR[g]; return `<div${ok(g) ? '' : ' class="dim"'}><span class="dim">${SLOT_N[sl]}</span>　<span style="color:${G?.rarColor || '#fff'}">${G?.name || '？'}</span>${where(g)}${G && !canEquip(id, g, S) && ['on', 'bag'].includes(outfitWhere(S, id, g).at) ? `（需要 Lv ${G.lvReq}）` : ''}</div>`; }).join('') || '<div class="dim">（全部空著）</div>'}</div></div>`; };
+    for (;;) {
+      const h = S.heroes[id], os = h.outfits || [];
+      const rows = [...Array(SET_SLOTS)].map((_, n) => { const o = os[n]; if (!o) return { label: `組合 ${n + 1}`, sub: '— 空 —' }; const w = GEAR[o.eq.R]?.name || '空手', c = EQUIP_SLOTS.filter(sl => o.eq[sl]).length, bad = EQUIP_SLOTS.filter(sl => o.eq[sl] && !ok(o.eq[sl])).length;
+        return { label: `組合 ${n + 1}${outfitWorn(S, id, n) ? '　<span style="color:#8f8">✔ 穿著中</span>' : ''}`, sub: `${w}　${c} 件${bad ? `　<span style="color:#f88">缺 ${bad}</span>` : ''}` }; });
+      const n = await this.choose(rows, { title: HEROES[id].name + '　裝備組合', start: st, info: look });
+      if (n < 0) return;
+      st = n;
+      if (!os[n]) { saveOutfit(S, id, n); this.G.audio.sfx('ok'); this.toast(`已把現在的裝備存成「組合 ${n + 1}」`); continue; }
+      const k = await this.choose([{ label: '換上這組', sub: outfitWorn(S, id, n) ? '已經穿著' : '' }, { label: '把現在的裝備存到這組', sub: '覆蓋' }, { label: '清除這組', sub: '' }], { title: `${HEROES[id].name}　組合 ${n + 1}`, info: () => look(n) });
+      if (k === 0) { const miss = wearOutfit(S, id, n); this.G.audio.sfx('item'); if (miss.length) await this.info(`<p>換上了組合 ${n + 1}，但有 ${miss.length} 件不在手邊，那些部位維持原本的裝備：</p>${miss.map(g => `<div>・${GEAR[g]?.name || '？'}${where(g)}${GEAR[g] && ['on', 'bag'].includes(outfitWhere(S, id, g).at) && !canEquip(id, g, S) ? `（需要 Lv ${GEAR[g].lvReq}）` : ''}</div>`).join('')}`, '裝備組合'); else this.toast(`換上了組合 ${n + 1}`); return; }
+      if (k === 1 && await this.yesno(`把現在穿的裝備存到「組合 ${n + 1}」？原本存的會被覆蓋。`)) { saveOutfit(S, id, n); this.G.audio.sfx('ok'); this.toast(`已存成「組合 ${n + 1}」`); }
+      if (k === 2 && await this.yesno(`清除「組合 ${n + 1}」？（裝備本身不會不見）`)) { os[n] = null; this.G.audio.sfx('cancel'); }
     }
   }
   // pick the strongest piece for every slot (weapons by power, armor by defence + spirit)
