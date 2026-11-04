@@ -250,16 +250,21 @@ const SETS_DEF = [
 export const SETS = {}; export const SET_ITEMS = {};
 for (const [id, name, lv, pieces, bonus] of SETS_DEF) {
   SETS[id] = { id, name, lv, bonus, pieces: pieces.map((p, i) => `${id}_${i}`) };
-  pieces.forEach(([base, pn, p], i) => { SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p, mk: (L) => scaleP(p, lv, L) }; });
+  pieces.forEach(([base, pn, own], i) => {
+    // the piece's own power on top of the stats any piece of its kind and level carries
+    const caster = /^(rod|staff|harp)/.test(base), st = powers(isWpn(base) ? `ed ${caster ? 'mag' : 'str'}` : base === 'ring' || base === 'amulet' ? 'hp' : 'edef hp', lv, isWpn(base), 0.6), p = { ...st, ...own, fx: { ...st.fx, ...(own.fx || {}) } };
+    for (const k of ['ed', 'edef', 'hp', 'mp', 'atk', 'mag']) if (st[k] && own[k]) p[k] = st[k] + own[k];
+    SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p, mk: (L) => scaleP(p, lv, L) };
+  });
 }
-// the thirty from loot2.js: each piece has a little of the theme, the set grows into it
+// the thirty from loot2.js: each piece carries one of the theme's powers and its stats, and the whole set outgrows the uniques
 SETS2.forEach(([name, lv, cls, themes, pieces], si) => {
-  const id = `s2_${si}`, t = themes.split(' '), n = pieces.length, top = (cls ? `cls:${cls} ` : 'skill ') + 'resall';
-  const bonus = { 2: { fx: powers(t[0], lv, false, 0.6, true).fx }, 3: { fx: powers(n === 3 ? `${t[1]} ${top}` : t[1], lv, false, 0.7, true).fx } };
-  if (n >= 4) bonus[4] = { fx: powers(n === 4 ? `${t[2]} ${top}` : t[2], lv, false, 0.8, true).fx };
-  if (n >= 5) bonus[5] = { fx: powers(`${top} ${t[0]} skill`, lv, false, 0.8, true).fx };
+  const id = `s2_${si}`, t = themes.split(' '), n = pieces.length, top = (cls ? `cls:${cls} ` : '') + 'skill resall';
+  const bonus = { 2: { fx: powers(t[0], lv, false, 1, true).fx }, 3: { fx: powers(n === 3 ? `${t[1]} ${t[2]} ${top}` : t[1], lv, false, 1, true).fx } };
+  if (n >= 4) bonus[4] = { fx: powers(n === 4 ? `${t[2]} ${top}` : `${t[2]} skill`, lv, false, 1.1, true).fx };
+  if (n >= 5) bonus[5] = { fx: powers(`${top} ${t[0]} skill`, lv, false, 1.1, true).fx };
   SETS[id] = { id, name, lv, bonus, pieces: pieces.map((p, i) => `${id}_${i}`) };
-  pieces.forEach(([base, pn], i) => { const tok = `${isWpn(base) ? 'ed' : base === 'ring' || base === 'amulet' ? 'hp' : 'edef'} ${t[i % t.length]}`; SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p: powers(tok, lv, isWpn(base), 0.5), mk: (L) => powers(tok, L, isWpn(base), 0.5) }; });
+  pieces.forEach(([base, pn], i) => { const caster = /^(rod|staff|harp)/.test(base) || ['sorc', 'necro', 'druid', 'bard'].includes(cls), tok = `${isWpn(base) ? `ed ${caster ? 'mag' : 'str'}` : base === 'ring' || base === 'amulet' ? `hp ${caster ? 'mag' : 'str'}` : 'edef hp'} ${t[i % t.length]}`; SET_ITEMS[`${id}_${i}`] = { id: `${id}_${i}`, set: id, name: pn, base, lv, p: powers(tok, lv, isWpn(base), 0.85), mk: (L) => powers(tok, L, isWpn(base), 0.85) }; });
 });
 export function setBonusFx(equipIds) {
   const count = {};

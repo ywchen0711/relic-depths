@@ -7,7 +7,7 @@
 const ELS = ['fire', 'ice', 'thunder', 'water', 'wind', 'earth', 'light', 'dark'];
 const r0 = (x) => Math.round(x), r2 = (x) => +x.toFixed(2);
 export function powers(tokens, L, weapon, k = 1, fxOnly = false) {
-  const p = { fx: {} }, f = p.fx, add = (key, v) => { if (fxOnly) { const m = { hp: ['hpP', v / 600], atk: ['atkP', v / 250], mag: ['magP', v / 250], def: ['defP', v / 250], spr: ['sprP', v / 250], spd: ['spdF', v], mp: ['mpP', v / 300] }[key]; if (m) { f[m[0]] = r2((f[m[0]] || 0) + m[1]); return; } } p[key] = (p[key] || 0) + v; };
+  const p = { fx: {} }, f = p.fx, add = (key, v) => { if (fxOnly) { const m = { hp: ['hpP', v / 900], atk: ['atkP', v / 250], mag: ['magP', v / 250], def: ['defP', v / 250], spr: ['sprP', v / 250], spd: ['spdF', v], mp: ['mpP', v / 300] }[key]; if (m) { f[m[0]] = r2((f[m[0]] || 0) + m[1]); return; } } p[key] = (p[key] || 0) + v; };
   for (const t of tokens.split(/\s+/).filter(Boolean)) {
     const [a, b] = t.split(':');
     if (ELS.includes(a)) { if (weapon) { f.el = a; f.elUp = { ...(f.elUp || {}), [a]: r2((0.2 + L / 250) * k) }; } else p.res = { ...(p.res || {}), [a]: r0((20 + L / 3) * k) }; continue; }
