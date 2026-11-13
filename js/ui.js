@@ -636,7 +636,7 @@ export class UI {
       ['怪物特性', `<div class="gi"><h4>每種特性都要用不同的方法對付</h4>${['fly', 'armor', 'evade', ...Object.keys(TRAIT_N).filter(k => !['fly', 'armor', 'evade'].includes(k))].map(tr).join('')}</div>`],
       ['迴響核心', `<div class="gi"><h4>每個迴響都有一個改變規則的核心能力</h4>${ECHO_ORDER.map(e => `<div class="gi-trait">${S.echoes[e] ? ECHOES[e].short : '？？？'}「${ECHOES[e].keyName}」</div><div style="margin:0 0 6px 1em">${ECHOES[e].keyDesc}</div>`).join('')}</div>`],
       ['迴響連攜', `<div class="gi"><h4>兩個迴響在同一隊時觸發</h4>${PAIRS.map(([a, b, , n, d]) => `<div class="gi-trait"><b>${n}</b>　${S.echoes[a] ? ECHOES[a].short : '？'} ＋ ${S.echoes[b] ? ECHOES[b].short : '？'}</div><div style="margin:0 0 6px 1em">${d}</div>`).join('')}</div>`],
-      ['套裝', `<div class="gi"><h4>同一套裝備穿越多件效果越強</h4>${Object.values(SETS).map(D => `<div class="gi-trait"><b>〔${D.name}〕</b>　${D.pieces.map(p => p[1]).join('、')}</div><div style="margin:0 0 6px 1em">2件：${D.d2}<br>4件：${D.d4}<br><small class="gi-kind">掉落：${D.fams.map(f => FAM_N[f]).join('、')}系的怪物</small></div>`).join('')}</div>`],
+      ['套裝', `<div class="gi"><h4>同一套裝備穿越多件效果越強</h4>${Object.values(SETS).map(D => `<div class="gi-trait"><b>〔${D.name}〕</b>　<small>需要等級 ${D.lv}</small>　${D.pieces.map(p => GEAR_SET_NAME(p)).join('、')}</div><div style="margin:0 0 6px 1em">${Object.entries(D.bonus).map(([n, b]) => `${n}件：${fxText(b.fx).concat(lootLines({ fx: b.fx })).join('、')}`).join('<br>')}</div>`).join('')}</div>`],
     ];
     await this.choose(pages.map(p => ({ label: p[0] })), { title: '戰術手冊', cls: 'items', info: (i) => pages[i][1] });
   }

@@ -1561,12 +1561,20 @@ class BattleUI {
     // keep enemy panels and floating numbers glued to the sprites
     const b = this.b, cam = b.camera, W = this.root.clientWidth, H = this.root.clientHeight;
     const v = new THREE.Vector3();
+    const boxes = [];
     for (const u of b.units.filter(u => u.side === 'enemy')) {
       if (!u.info) continue;
       v.set(u.x + (u.ox || 0), -0.15, u.z).project(cam);
-      u.info.style.transform = `translate(${(v.x * 0.5 + 0.5) * W}px, ${(-v.y * 0.5 + 0.5) * H}px) translate(-50%, 0)`;
+      boxes.push({ u, x: (v.x * 0.5 + 0.5) * W, y: (-v.y * 0.5 + 0.5) * H, w: u.info.offsetWidth, h: u.info.offsetHeight });
       u.info.classList.toggle('target', this.targetSet?.includes(u));
     }
+    // panels of monsters standing close together (a narrow screen) would print over each other: push the lower one down
+    boxes.sort((a, c) => a.y - c.y);
+    for (let i = 0; i < boxes.length; i++) for (let j = 0; j < i; j++) {
+      const a = boxes[j], c = boxes[i]; if (!a.h || !c.h) continue;
+      if (Math.abs(a.x - c.x) < (a.w + c.w) / 2 - 4 && c.y < a.y + a.h) c.y = a.y + a.h;
+    }
+    for (const o of boxes) o.u.info.style.transform = `translate(${o.x}px, ${o.y}px) translate(-50%, 0)`;
     for (const u of b.party) { const el = this.pt.querySelector(`[data-id="${u.id}"]`); if (el) el.classList.toggle('target', !!this.targetSet?.includes(u)); }
     const now = performance.now();
     this.floats = this.floats.filter(f => {

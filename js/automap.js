@@ -73,7 +73,7 @@ export class AutoMap {
   tick(dt) {
     if (!this.f || !this.mini) return;
     this.reveal();
-    if (this.saveT > 0 && (this.saveT -= dt) <= 0 && this.dirty) { this.S.explored[this.id] = encode(this.bits); this.dirty = false; }
+    if (this.saveT > 0 && (this.saveT -= dt) <= 0 && this.dirty) { (this.S.explored ||= {})[this.id] = encode(this.bits); this.dirty = false; }
     this.t += dt; if (this.t < 0.12) return; this.t = 0;
     this.draw();
   }
@@ -124,7 +124,7 @@ export class AutoMap {
   // ---------------------------------------------------------------- the full map
   async openFull() {
     const f = this.f, G = this.G; if (!f) return;
-    this.S.explored[this.id] = encode(this.bits);
+    (this.S.explored ||= {})[this.id] = encode(this.bits);
     const wrap = document.createElement('div'); wrap.className = 'mapview';
     const enc = f.encTable?.(); const lv = enc?.lv;
     const ms = this.markers(); const chests = ms.filter(m => m.k === 'chest').length;

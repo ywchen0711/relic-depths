@@ -66,8 +66,10 @@ body.attitle #hud, body.inbattle #hud, body.attitle #touch { display: none; }
 .chooser.wide .ch-list { width: 260px; max-height: none; }
 .ch-it { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 16px; border: 1px solid transparent; }
 .ch-it img { width: 26px; height: 23px; image-rendering: pixelated; }
-.ch-it .ch-l { flex: 1; white-space: nowrap; }
-.ch-it .ch-s { color: var(--dim); font-size: 13px; white-space: nowrap; }
+.ch-it .ch-l { flex: 1 1 auto; min-width: 2.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-it .ch-s { color: var(--dim); font-size: 13px; white-space: nowrap; flex: 0 10 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ch-it img { flex: none; }
+body:has(#ui .chooser) #hud { visibility: hidden; } /* the minimap and party strip peeked out around (or under) the menu windows */
 .ch-it { position: relative; }
 .ch-it.sel { background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02)); }
 .ch-it.sel::before, .bc-it.sel::before { content: ''; position: absolute; left: -14px; top: 50%; width: 20px; height: 14px; margin-top: -7px; background: var(--hand) no-repeat center / contain; image-rendering: pixelated; animation: hand 0.5s steps(2) infinite; }
@@ -344,6 +346,7 @@ body.portrait .b-pc.cur { transform: translateY(-4px); }
 body.portrait .b-cmd { bottom: calc(var(--party-h, 96px) + 18px + var(--sb)); max-width: 62vw; }
 body.portrait .b-cmd .bc-list { max-height: 32dvh; }
 body.portrait .b-tools { top: calc(48px + var(--st)); }
+body.portrait .b-msg { margin-top: 42px; } /* the target line went under the auto/speed buttons */
 body.portrait .chooser.small { padding-bottom: calc(150px + var(--sb)); }
 
 /* ---------- phones held sideways (short screens) ---------- */

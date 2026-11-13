@@ -1,7 +1,7 @@
 // The new windows: picking a class, skill trees, stat points, the bag, the stash, the shop, gambling, hiring and
 // the waypoints. They are added to the UI class from ui.js so they share its chooser and tooltips.
 import { rollKey, keyPower, keyLootQ, keyLine, afxText, rewardText, riftBoss, RIFT_AFX, RIFT_MAX } from './rift.js?v=1';
-import { UI, fullSprite, portrait } from './ui.js?v=1';
+import { UI, fullSprite, portrait } from './ui.js?v=2';
 import { HEROES, SKILLS, GEAR, ITEMS, ELEM, clsOf, ENEMIES } from './data.js?v=1';
 import { heroStats, addItem, itemName, canLearn, learnSkill, addStat, skillLv, skillBonus, synergyOf, canEquip, equip, slotFits, EQUIP_SLOTS, SLOT_N, addHero, gearFx, hireHero, dismissHero, isLead, MAX_HEROES, inOutfit } from './party.js?v=1';
 import { CLASSES, CLASS_ORDER, TREES, SKILL_INFO, SKILL_MAX, TREE_REQ } from './classes.js?v=1';
