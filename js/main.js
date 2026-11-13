@@ -3,7 +3,7 @@ import * as THREE from '../lib/three.module.min.js';
 import { createRenderer, createPost } from './render.js?v=1';
 import { Field, setHeroLook } from './field.js?v=1';
 import { setDepth, setPaper, setPaperCam } from './voxel.js?v=1';
-import { Battle } from './battle.js?v=1';
+import { Battle } from './battle.js?v=2';
 import { UI, fmtTime } from './ui.js?v=1';
 import { Audio } from './audio.js?v=1';
 import { Input } from './input.js?v=1';

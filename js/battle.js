@@ -60,6 +60,16 @@ const LIGHT = {
 
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
+// status tags for the party panel and the enemy name boxes: every active status as a short coloured tag
+const ST_TAG = { poison: ['毒', '#3a9a3a'], sleep: ['眠', '#5a5ab0'], silence: ['默', '#6a6a8a'], blind: ['盲', '#4a4a4a'], slow: ['緩', '#3a5aa0'], stun: ['暈', '#a08a1a'], stop: ['停', '#4a4ac0'], doom: ['亡', '#6a1a8a'], confuse: ['亂', '#b04a90'], curse: ['咒', '#5a1a5a'], regen: ['再', '#1a8a5a'], haste: ['速', '#c07a1a'], reflect: ['反', '#1a8aa8'], reraise: ['生', '#a08a2a'], frozen: ['凍', '#3aa0c8'], burn: ['燒', '#c04a1a'], chill: ['寒', '#2a80b0'], wet: ['濕', '#2a5ab0'], mud: ['泥', '#7a5a2a'], erosion: ['蝕', '#7a3a1a'], hidden: ['隱', '#3a4a5a'], enraged: ['怒', '#a01a1a'] };
+const BUFF_S = { atk: '攻', def: '防', mag: '魔', spr: '精', spd: '速' };
+function stTags(u, max = 5) {
+  const out = [];
+  for (const [k, n] of Object.entries(u.status || {})) { if (!n) continue; const t = ST_TAG[k]; const txt = t ? t[0] : STATUS_S[k] || (STATUS_N[k] || k).slice(0, 1); out.push(`<i title="${STATUS_N[k] || k}${n < 90 ? ' ' + n : ''}" style="background:${t ? t[1] : '#5a2a6a'}">${txt}${k === 'doom' && n < 90 ? n : ''}</i>`); }
+  for (const [k, b] of Object.entries(u.buffs || {})) if (b && b.v) out.push(`<i class="${b.v > 0 ? 'up' : 'dn'}">${BUFF_S[k] || k}${b.v > 0 ? '↑' : '↓'}</i>`);
+  return out.length > max ? out.slice(0, max - 1).join('') + `<i class="more">+${out.length - max + 1}</i>` : out.join('');
+}
+
 export class Battle {
   constructor(game) {
     this.G = game; this.S = game.S;
@@ -1500,7 +1510,7 @@ class BattleUI {
   }
   addEnemy(u) {
     const d = document.createElement('div'); d.className = 'b-einfo' + (u.boss ? ' boss' : '');
-    d.innerHTML = `<div class="b-ename">${u.name}<span class="b-etr">${[...u.traits].filter(t => TRAIT_N[t]).map(t => `<i title="${TRAIT_N[t][1]}：${TRAIT_N[t][2]}">${TRAIT_N[t][0]}</i>`).join('')}</span><span class="b-est"></span></div>${u.mods?.length ? `<div style="font-size:10px;line-height:1.2;color:${u.rank === 2 ? '#e8b040' : '#8ab0ff'}">${u.mods.map(m => m.skill ? `<b style="color:#ff8a6a">${m.n}</b>` : m.n).join('・')}</div>` : ''}<div class="b-ebar"><i></i></div><div class="b-erow"><span class="b-shield"><b></b></span><span class="b-weak"></span></div>`;
+    d.innerHTML = `<div class="b-ename">${u.name}<span class="b-etr">${[...u.traits].filter(t => TRAIT_N[t]).map(t => `<i title="${TRAIT_N[t][1]}：${TRAIT_N[t][2]}">${TRAIT_N[t][0]}</i>`).join('')}</span><span class="b-est"></span></div><div class="b-ests b-st"></div>${u.mods?.length ? `<div style="font-size:10px;line-height:1.2;color:${u.rank === 2 ? '#e8b040' : '#8ab0ff'}">${u.mods.map(m => m.skill ? `<b style="color:#ff8a6a">${m.n}</b>` : m.n).join('・')}</div>` : ''}<div class="b-ebar"><i></i></div><div class="b-erow"><span class="b-shield"><b></b></span><span class="b-weak"></span></div>`;
     this.en.appendChild(d); u.info = d;
     d.onclick = () => this.pickHook && this.pickHook(u);
   }
@@ -1526,8 +1536,8 @@ class BattleUI {
     { let mn = this.root.querySelector('#bmn'); const ms = b.units.filter(u => u.minion); if (!mn) { mn = document.createElement('div'); mn.id = 'bmn'; mn.style.cssText = 'position:absolute;top:96px;right:12px;display:flex;flex-direction:column;gap:3px;font-size:12px;z-index:3;pointer-events:none'; this.root.appendChild(mn); }
       mn.innerHTML = ms.map(m => `<div style="background:rgba(10,20,30,.72);border:1px solid #6a9a5a;border-radius:6px;padding:2px 8px;min-width:130px;opacity:${m.alive ? 1 : 0.4}"><span style="color:#b8e8a0">${m.name}</span> <span style="float:right">${Math.max(0, m.hp)}/${m.st.hp}</span><div style="height:3px;background:#333;margin-top:2px"><i style="display:block;height:3px;width:${Math.max(0, m.hp) / m.st.hp * 100}%;background:#7ae86a"></i></div></div>`).join(''); }
     this.pt.innerHTML = b.party.map(u => {
-      const st = Object.keys(u.status).map(k => STATUS_S[k] || '').join('') + Object.keys(u.barrier || {}).map(e => ICON[e]).join('') + (u.stance ? '構' : '') + (u.enchant ? ICON[u.enchant.el] : '');
-      const bf = Object.entries(u.buffs).map(([k, v]) => `<i class="${v.v > 0 ? 'up' : 'dn'}">${({ atk: '攻', def: '防', mag: '魔', spr: '精', spd: '速' })[k]}</i>`).join('');
+      const st = Object.keys(u.barrier || {}).map(e => ICON[e]).join('') + (u.stance ? '構' : '') + (u.enchant ? ICON[u.enchant.el] : '');
+      const bf = stTags(u);
       return `<div class="b-pc ${u.alive ? '' : 'ko'} ${b.current === u ? 'cur' : ''}" data-id="${u.id}">
         <div class="b-pn"><b style="color:${u.color}">${u.name}</b><span class="b-st">${st}${bf}${u.taunt ? '<i class="up">挑</i>' : ''}${u.jumping ? '<i class="up">跳</i>' : ''}</span></div>
         <div class="b-bars"><div class="b-hp"><div class="bar"><i style="width:${u.hp / u.st.hp * 100}%"></i></div><em>${u.hp}</em></div>
@@ -1539,7 +1549,8 @@ class BattleUI {
       d.style.display = u.alive ? '' : 'none';
       d.querySelector('.b-ebar i').style.width = (u.hp / u.st.hp * 100) + '%';
       const sh = d.querySelector('.b-shield'); sh.classList.toggle('broken', u.broken); sh.querySelector('b').textContent = u.broken ? 'BREAK' : u.shield;
-      d.querySelector('.b-est').textContent = (u.imm?.size ? '免' + [...u.imm].map(e => e === 'phys' ? '⚔' : ICON[e] || '').join('') + (u.broken || u.noResist || b.convict ? '✕' : '') + ' ' : '') + (u.phase === 'phys' ? '🛡' : u.phase === 'mag' ? '🔮' : '') + (u.charging ? '⚡' : '') + (u.count != null ? '⏳' + u.count : '') + (u.hard ? '殼' + u.hard : '') + (u.curEl ? ICON[u.curEl] || '' : '') + (u.stoleItem || u.stoleGil ? '💰' : '') + Object.keys(u.status).map(k => STATUS_S[k] || '').join('') + (u.noArmor && u.traits.has('armor') ? '破' : '') + (u.grounded ? '墜' : '') + (u.mark ? '印' : '');
+      d.querySelector('.b-est').textContent = (u.imm?.size ? '免' + [...u.imm].map(e => e === 'phys' ? '⚔' : ICON[e] || '').join('') + (u.broken || u.noResist || b.convict ? '✕' : '') + ' ' : '') + (u.phase === 'phys' ? '🛡' : u.phase === 'mag' ? '🔮' : '') + (u.charging ? '⚡' : '') + (u.count != null ? '⏳' + u.count : '') + (u.hard ? '殼' + u.hard : '') + (u.curEl ? ICON[u.curEl] || '' : '') + (u.stoleItem || u.stoleGil ? '💰' : '') + (u.noArmor && u.traits.has('armor') ? '破' : '') + (u.grounded ? '墜' : '') + (u.mark ? '印' : '');
+      d.querySelector('.b-ests').innerHTML = stTags(u, 6);
       d.querySelector('.b-etr').style.opacity = (u.noArmor && u.traits.has('armor')) || (u.grounded && u.traits.has('fly')) ? 0.35 : 1;
       const allWeak = [...u.weak, ...Object.keys(u.extraWeak || {}).filter(w => !u.weak.includes(w))];
       const tags = u.E.hideWeak ? allWeak.filter(w => u.revealed.has(w)).slice(0, 10) : allWeak;
